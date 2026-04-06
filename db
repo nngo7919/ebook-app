@@ -1,0 +1,61 @@
+🧠 1. CORE TABLES (xương sống hệ thống)
+
+1. users
+2. books
+3. chapters
+4. genres (tag thể loại)
+5. book_genres (many-to-many)
+   ⭐ 2. INTERACTION TABLES (like, view, rating)
+6. ratings
+7. likes
+8. views
+   🔥 3. TRENDING / ANALYTICS
+9. book_stats (cache để tối ưu)
+   📚 4. USER LIBRARY (my library)
+10. reading_history
+11. favorites (yêu thích)
+12. downloads
+13. ebooks (file user upload)
+    👤 6. FOLLOW SYSTEM
+14. follows_books
+15. follows_authors
+    🔔 7. NOTIFICATIONS
+16. notifications
+    📦 8. COLLECTION (bộ sưu tập)
+17. collections
+18. collection_books
+19. collection_likes
+    📤 9. UPLOAD SYSTEM
+
+👉 thực ra dùng luôn books:
+
+books.author_id = user_id
+thêm:
+is_published (boolean)
+
+🧩 10. FEATURE MAPPING (cái bạn mô tả → DB)
+Library page
+Feature Cách làm
+Đánh giá ratings + book*stats.avg_rating
+Yêu thích likes
+Lượt xem views
+Thịnh hành book_stats.daily_views
+Mới đăng books.created_at
+Mới cập nhật books.updated_at
+Full books.status = completed
+My Library
+Feature Table
+Đọc gần đây reading_history
+Yêu thích gần đây favorites
+Tải gần đây downloads
+Ebook ebooks
+Search
+Feature
+tên truyện books.title
+tác giả join authors
+thể loại join genres
+Notification
+Trigger
+chapter mới chapters insert
+author ra truyện books insert
+follow follows*\*

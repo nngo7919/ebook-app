@@ -1,157 +1,273 @@
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-	Alert,
-	FlatList,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+  Dimensions,
+  FlatList,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
+
+const { width } = Dimensions.get("window");
+const BOOK_CARD_WIDTH = (width - 48) / 3.5;
 
 type Book = {
   id: string;
   title: string;
   author: string;
   tag: "novel" | "book";
+  cover_url?: string;
 };
 
+const QUICK_FILTERS = [
+  { icon: "⭐", label: "Đánh Giá" },
+  { icon: "❤️", label: "Yêu Thích" },
+  { icon: "📊", label: "Xem Nhiều" },
+  { icon: "📈", label: "Thịnh Hành" },
+];
+
+const FULL_CATEGORIES = [
+  { label: "Full – Mới Cập Nhật" },
+  { label: "Full – Đánh Giá Cao" },
+  { label: "Full – Yêu Thích" },
+  { label: "Full – Xem Nhiều" },
+];
+
 export default function LibraryScreen() {
-  const [books, setBooks] = useState<Book[]>([]);
-  const [filter, setFilter] = useState<"all" | "novel" | "book">("all");
+  const router = useRouter();
+  const [newBooks, setNewBooks] = useState<Book[]>([]);
+  const [updatedBooks, setUpdatedBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
-  const [downloading, setDownloading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchBooks();
-  }, [filter]);
+  }, []);
 
   async function fetchBooks() {
     setLoading(true);
-    let query = supabase.from("books").select("*");
-    if (filter !== "all") query = query.eq("tag", filter);
-    const { data } = await query;
-    setBooks(data || []);
+    const { data } = await supabase
+      .from("books")
+      .select("*")
+      .order("created_at", { ascending: false });
+    const all = data || [];
+    setNewBooks(all.slice(0, 6));
+    setUpdatedBooks(all.slice(0, 6));
     setLoading(false);
   }
 
-  async function handleDownload(book: Book) {
-    setDownloading(book.id);
-    const { error } = await supabase.from("user_library").insert({
-      book_id: book.id,
-      source: "download",
-      title: book.title,
-      author: book.author,
-      tag: book.tag,
-    });
-    setDownloading(null);
-    if (error) {
-      Alert.alert("Lỗi", "Không thể download sách này");
-    } else {
-      Alert.alert("✅ Thành công", `"${book.title}" đã lưu vào My Library`);
-    }
+  function BookCard({ item }: { item: Book }) {
+    return (
+      <TouchableOpacity
+        style={styles.bookCard}
+        onPress={() => router.push(`/reader/${item.id}`)}
+      >
+        <View style={styles.bookCover}>
+          {item.cover_url ? (
+            <Image source={{ uri: item.cover_url }} style={styles.coverImage} />
+          ) : (
+            <View style={styles.coverPlaceholder}>
+              <Text style={styles.coverEmoji}>
+                {item.tag === "novel" ? "📖" : "📚"}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.bookTitle} numberOfLines={2}>
+          {item.title}
+        </Text>
+      </TouchableOpacity>
+    );
+  }
+
+  function SectionHeader({
+    title,
+    onMore,
+  }: {
+    title: string;
+    onMore?: () => void;
+  }) {
+    return (
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {onMore && (
+          <TouchableOpacity onPress={onMore}>
+            <Text style={styles.seeMore}>Xem Thêm ▶</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>🌐 Library</Text>
-
-      <View style={styles.filters}>
-        {(["all", "novel", "book"] as const).map((f) => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.filterBtn, filter === f && styles.filterActive]}
-            onPress={() => setFilter(f)}
-          >
-            <Text
-              style={[
-                styles.filterText,
-                filter === f && styles.filterTextActive,
-              ]}
-            >
-              {f === "all" ? "Tất cả" : f === "novel" ? "📖 Novel" : "📚 Book"}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>TYT</Text>
+        <TouchableOpacity style={styles.filterIconBtn}>
+          <Text style={styles.filterIconText}>⚙️</Text>
+        </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <Text style={styles.loading}>Đang tải...</Text>
-      ) : (
-        <FlatList
-          data={books}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.cardLeft}>
-                <Text style={styles.tagIcon}>
-                  {item.tag === "novel" ? "📖" : "📚"}
-                </Text>
-              </View>
-              <View style={styles.cardRight}>
-                <Text style={styles.title}>{item.title}</Text>
-                <Text style={styles.author}>{item.author}</Text>
-              </View>
-              <TouchableOpacity
-                style={[
-                  styles.dlBtn,
-                  downloading === item.id && styles.dlBtnLoading,
-                ]}
-                onPress={() => handleDownload(item)}
-                disabled={downloading === item.id}
-              >
-                <Text style={styles.dlText}>
-                  {downloading === item.id ? "..." : "💾"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Quick Filter Buttons */}
+        <View style={styles.quickFilters}>
+          {QUICK_FILTERS.map((f, i) => (
+            <TouchableOpacity
+              key={i}
+              style={styles.quickFilterBtn}
+              onPress={() =>
+                router.push({
+                  pathname: "/category",
+                  params: { title: f.label },
+                })
+              }
+            >
+              <Text style={styles.quickFilterIcon}>{f.icon}</Text>
+              <Text style={styles.quickFilterLabel}>{f.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Mới Đăng */}
+        <SectionHeader
+          title="Mới đăng"
+          onMore={() =>
+            router.push({
+              pathname: "/category",
+              params: { title: "Mới Đăng" },
+            })
+          }
         />
-      )}
+        <FlatList
+          data={newBooks}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id + "new"}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => <BookCard item={item} />}
+        />
+
+        {/* Mới Cập Nhật */}
+        <SectionHeader
+          title="Mới cập nhật"
+          onMore={() =>
+            router.push({
+              pathname: "/category",
+              params: { title: "Mới Cập Nhật" },
+            })
+          }
+        />
+        <FlatList
+          data={updatedBooks}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id + "updated"}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => <BookCard item={item} />}
+        />
+
+        {/* Truyện Full - Hoàn */}
+        <View style={styles.fullSection}>
+          <Text style={styles.sectionTitle}>Truyện Full – Hoàn</Text>
+          <View style={styles.fullGrid}>
+            {FULL_CATEGORIES.map((cat, i) => (
+              <TouchableOpacity
+                key={i}
+                style={styles.fullCategoryBtn}
+                onPress={() =>
+                  router.push({
+                    pathname: "/category",
+                    params: { title: cat.label },
+                  })
+                }
+              >
+                <Text style={styles.fullCategoryText}>{cat.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={{ height: 32 }} />
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#121212", paddingTop: 16 },
-  heading: {
-    fontSize: 22,
+  container: { flex: 1, backgroundColor: "#0d0d0d" },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    position: "relative",
+  },
+  headerTitle: {
+    color: "#ffffff",
+    fontSize: 18,
     fontWeight: "bold",
-    color: "#fff",
+    letterSpacing: 1,
+  },
+  filterIconBtn: { position: "absolute", right: 16, top: 14 },
+  filterIconText: { fontSize: 20 },
+  quickFilters: {
+    flexDirection: "row",
+    paddingHorizontal: 12,
+    gap: 10,
+    marginBottom: 24,
+  },
+  quickFilterBtn: {
+    flex: 1,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    gap: 6,
+  },
+  quickFilterIcon: { fontSize: 22 },
+  quickFilterLabel: { color: "#cccccc", fontSize: 11, textAlign: "center" },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     marginBottom: 12,
   },
-  filters: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 16,
+  sectionTitle: { color: "#ffffff", fontSize: 17, fontWeight: "bold" },
+  seeMore: { color: "#4a9eff", fontSize: 13 },
+  horizontalList: { paddingHorizontal: 16, gap: 12, marginBottom: 24 },
+  bookCard: { width: BOOK_CARD_WIDTH },
+  bookCover: {
+    width: BOOK_CARD_WIDTH,
+    height: BOOK_CARD_WIDTH * 1.4,
+    borderRadius: 8,
+    overflow: "hidden",
+    marginBottom: 6,
   },
-  filterBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: "#2a2a2a",
-  },
-  filterActive: { backgroundColor: "#6366f1" },
-  filterText: { color: "#888", fontSize: 13 },
-  filterTextActive: { color: "#fff" },
-  loading: { color: "#888", textAlign: "center", marginTop: 40 },
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
+  coverImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  coverPlaceholder: {
+    width: "100%",
+    height: "100%",
     backgroundColor: "#1e1e1e",
-    marginHorizontal: 16,
-    marginBottom: 10,
-    borderRadius: 10,
-    padding: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  cardLeft: { marginRight: 12 },
-  tagIcon: { fontSize: 28 },
-  cardRight: { flex: 1 },
-  title: { color: "#fff", fontSize: 16, fontWeight: "bold", marginBottom: 4 },
-  author: { color: "#888", fontSize: 13 },
-  dlBtn: { backgroundColor: "#2a2a2a", borderRadius: 8, padding: 8 },
-  dlBtnLoading: { opacity: 0.5 },
-  dlText: { fontSize: 18 },
+  coverEmoji: { fontSize: 32 },
+  bookTitle: { color: "#cccccc", fontSize: 12, lineHeight: 16 },
+  fullSection: { paddingHorizontal: 16, marginBottom: 8 },
+  fullGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 12 },
+  fullCategoryBtn: {
+    width: "48%",
+    backgroundColor: "#1a1a1a",
+    borderRadius: 10,
+    paddingVertical: 18,
+    alignItems: "center",
+  },
+  fullCategoryText: { color: "#ffffff", fontSize: 14, fontWeight: "500" },
 });
