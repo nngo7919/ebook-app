@@ -1,8 +1,12 @@
+import * as DocumentPicker from "expo-document-picker";
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+  Alert,
   Dimensions,
   FlatList,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,55 +16,111 @@ import {
 import { supabase } from "../../lib/supabase";
 
 const { width } = Dimensions.get("window");
-const BOOK_CARD_WIDTH = (width - 48) / 3.5;
+const CARD_WIDTH = 140;
+const CARD_HEIGHT = CARD_WIDTH * 1.4;
 
-type Book = {
+type MyBook = {
   id: string;
   title: string;
   author: string;
-  tag: "novel" | "book";
+  tag: string;
+  source: "download" | "upload";
+  book_id: string;
   cover_url?: string;
 };
 
-const QUICK_FILTERS = [
-  { icon: "⭐", label: "Đánh Giá" },
-  { icon: "❤️", label: "Yêu Thích" },
-  { icon: "📊", label: "Xem Nhiều" },
-  { icon: "📈", label: "Thịnh Hành" },
-];
-
-const FULL_CATEGORIES = [
-  { label: "Full – Mới Cập Nhật" },
-  { label: "Full – Đánh Giá Cao" },
-  { label: "Full – Yêu Thích" },
-  { label: "Full – Xem Nhiều" },
-];
-
-export default function LibraryScreen() {
-  const [newBooks, setNewBooks] = useState<Book[]>([]);
-  const [updatedBooks, setUpdatedBooks] = useState<Book[]>([]);
+export default function MyLibraryScreen() {
+  const router = useRouter();
+  const [recentBooks, setRecentBooks] = useState<MyBook[]>([]);
+  const [favoriteBooks, setFavoriteBooks] = useState<MyBook[]>([]);
+  const [downloadedBooks, setDownloadedBooks] = useState<MyBook[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchBooks();
-  }, []);
-
-  async function fetchBooks() {
+  async function fetchMyBooks() {
     setLoading(true);
     const { data } = await supabase
-      .from("books")
+      .from("user_library")
       .select("*")
+      .eq("user_id", "local-user")
       .order("created_at", { ascending: false });
+
     const all = data || [];
-    setNewBooks(all.slice(0, 6));
-    setUpdatedBooks(all.slice(0, 6));
+    setRecentBooks(all.slice(0, 6));
+    setFavoriteBooks(all.slice(0, 6));
+    setDownloadedBooks(all.filter((b) => b.source === "download").slice(0, 6));
     setLoading(false);
   }
 
-  function BookCard({ item }: { item: Book }) {
+  useEffect(() => {
+    fetchMyBooks();
+  }, []);
+
+  async function handleUpload() {
+    if (Platform.OS === "web") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".pdf,.epub";
+      input.onchange = async (e: any) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const fileName = file.name.replace(/\.[^/.]+$/, "");
+        setUploading(true);
+        const { error } = await supabase.from("user_library").insert({
+          user_id: "local-user",
+          source: "upload",
+          title: fileName,
+          author: "Không rõ",
+          tag: "book",
+          file_path: file.name,
+        });
+        setUploading(false);
+        if (error) {
+          Alert.alert("Lỗi", error.message);
+        } else {
+          Alert.alert("✅ Thành công", `Đã thêm "${fileName}"`);
+          fetchMyBooks();
+        }
+      };
+      input.click();
+    } else {
+      try {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: ["application/epub+zip", "application/pdf"],
+          copyToCacheDirectory: true,
+        });
+        if (result.canceled) return;
+        const file = result.assets[0];
+        const fileName = file.name.replace(/\.[^/.]+$/, "");
+        setUploading(true);
+        const { error } = await supabase.from("user_library").insert({
+          user_id: "local-user",
+          source: "upload",
+          title: fileName,
+          author: "Không rõ",
+          tag: "book",
+          file_path: file.uri,
+        });
+        setUploading(false);
+        if (error) {
+          Alert.alert("Lỗi", error.message);
+        } else {
+          Alert.alert("✅ Thành công", `Đã thêm "${fileName}"`);
+          fetchMyBooks();
+        }
+      } catch {
+        setUploading(false);
+      }
+    }
+  }
+
+  function BookCard({ item }: { item: MyBook }) {
     return (
-      <TouchableOpacity style={styles.bookCard}>
-        <View style={styles.bookCover}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push(`/reader/${item.book_id || item.id}`)}
+      >
+        <View style={styles.coverWrapper}>
           {item.cover_url ? (
             <Image source={{ uri: item.cover_url }} style={styles.coverImage} />
           ) : (
@@ -70,8 +130,11 @@ export default function LibraryScreen() {
               </Text>
             </View>
           )}
+          <View style={styles.fullBadge}>
+            <Text style={styles.fullBadgeText}>FULL</Text>
+          </View>
         </View>
-        <Text style={styles.bookTitle} numberOfLines={2}>
+        <Text style={styles.cardTitle} numberOfLines={2}>
           {item.title}
         </Text>
       </TouchableOpacity>
@@ -80,19 +143,23 @@ export default function LibraryScreen() {
 
   function SectionHeader({
     title,
-    onMore,
+    onPress,
   }: {
     title: string;
-    onMore?: () => void;
+    onPress?: () => void;
   }) {
     return (
-      <View style={styles.sectionHeader}>
+      <TouchableOpacity style={styles.sectionHeader} onPress={onPress}>
         <Text style={styles.sectionTitle}>{title}</Text>
-        {onMore && (
-          <TouchableOpacity onPress={onMore}>
-            <Text style={styles.seeMore}>Xem Thêm ▶</Text>
-          </TouchableOpacity>
-        )}
+        <Text style={styles.sectionArrow}>›</Text>
+      </TouchableOpacity>
+    );
+  }
+
+  function EmptySection() {
+    return (
+      <View style={styles.emptySection}>
+        <Text style={styles.emptyText}>Chưa có sách nào</Text>
       </View>
     );
   }
@@ -101,56 +168,65 @@ export default function LibraryScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>TYT</Text>
-        <TouchableOpacity style={styles.filterIcon}>
-          <Text style={styles.filterIconText}>⚙️</Text>
+        <Text style={styles.headerTitle}>Truyện Trên Thiết Bị - Offline</Text>
+        <TouchableOpacity
+          style={[styles.uploadBtn, uploading && { opacity: 0.5 }]}
+          onPress={handleUpload}
+          disabled={uploading}
+        >
+          <Text style={styles.uploadText}>{uploading ? "..." : "📤"}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Quick Filter Buttons */}
-        <View style={styles.quickFilters}>
-          {QUICK_FILTERS.map((f, i) => (
-            <TouchableOpacity key={i} style={styles.quickFilterBtn}>
-              <Text style={styles.quickFilterIcon}>{f.icon}</Text>
-              <Text style={styles.quickFilterLabel}>{f.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Đọc Gần Đây */}
+        <SectionHeader title="Đọc Gần Đây" />
+        {recentBooks.length === 0 ? (
+          <EmptySection />
+        ) : (
+          <FlatList
+            data={recentBooks}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id + "recent"}
+            contentContainerStyle={styles.horizontalList}
+            renderItem={({ item }) => <BookCard item={item} />}
+          />
+        )}
 
-        {/* Mới Đăng */}
-        <SectionHeader title="Mới đăng" onMore={() => {}} />
-        <FlatList
-          data={newBooks}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id + "new"}
-          contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => <BookCard item={item} />}
-        />
+        <View style={styles.divider} />
 
-        {/* Mới Cập Nhật */}
-        <SectionHeader title="Mới cập nhật" onMore={() => {}} />
-        <FlatList
-          data={updatedBooks}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id + "updated"}
-          contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => <BookCard item={item} />}
-        />
+        {/* Yêu Thích Gần Đây */}
+        <SectionHeader title="Yêu Thích Gần Đây" />
+        {favoriteBooks.length === 0 ? (
+          <EmptySection />
+        ) : (
+          <FlatList
+            data={favoriteBooks}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id + "fav"}
+            contentContainerStyle={styles.horizontalList}
+            renderItem={({ item }) => <BookCard item={item} />}
+          />
+        )}
 
-        {/* Truyện Full - Hoàn */}
-        <View style={styles.fullSection}>
-          <Text style={styles.sectionTitle}>Truyện Full – Hoàn</Text>
-          <View style={styles.fullGrid}>
-            {FULL_CATEGORIES.map((cat, i) => (
-              <TouchableOpacity key={i} style={styles.fullCategoryBtn}>
-                <Text style={styles.fullCategoryText}>{cat.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <View style={styles.divider} />
+
+        {/* Tải Gần Đây - Đọc Offline */}
+        <SectionHeader title="Tải Gần Đây - Đọc Offline" />
+        {downloadedBooks.length === 0 ? (
+          <EmptySection />
+        ) : (
+          <FlatList
+            data={downloadedBooks}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id + "dl"}
+            contentContainerStyle={styles.horizontalList}
+            renderItem={({ item }) => <BookCard item={item} />}
+          />
+        )}
 
         <View style={{ height: 32 }} />
       </ScrollView>
@@ -159,58 +235,29 @@ export default function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#0d0d0d",
-  },
+  container: { flex: 1, backgroundColor: "#0d0d0d" },
 
   // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    position: "relative",
+    paddingVertical: 14,
   },
   headerTitle: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "bold",
-    letterSpacing: 1,
-  },
-  filterIcon: {
-    position: "absolute",
-    right: 16,
-  },
-  filterIconText: {
-    fontSize: 20,
-  },
-
-  // Quick filters
-  quickFilters: {
-    flexDirection: "row",
-    paddingHorizontal: 12,
-    gap: 10,
-    marginBottom: 24,
-  },
-  quickFilterBtn: {
     flex: 1,
-    backgroundColor: "#1a1a1a",
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: "center",
-    gap: 6,
-  },
-  quickFilterIcon: {
-    fontSize: 22,
-  },
-  quickFilterLabel: {
-    color: "#cccccc",
-    fontSize: 11,
     textAlign: "center",
   },
+  uploadBtn: {
+    position: "absolute",
+    right: 16,
+    padding: 4,
+  },
+  uploadText: { fontSize: 20 },
 
   // Section header
   sectionHeader: {
@@ -218,39 +265,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    marginBottom: 12,
+    paddingVertical: 16,
   },
   sectionTitle: {
     color: "#ffffff",
     fontSize: 17,
     fontWeight: "bold",
   },
-  seeMore: {
-    color: "#4a9eff",
-    fontSize: 13,
+  sectionArrow: {
+    color: "#888",
+    fontSize: 22,
+    fontWeight: "300",
   },
 
   // Book cards
   horizontalList: {
     paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 24,
+    gap: 14,
+    paddingBottom: 16,
   },
-  bookCard: {
-    width: BOOK_CARD_WIDTH,
-  },
-  bookCover: {
-    width: BOOK_CARD_WIDTH,
-    height: BOOK_CARD_WIDTH * 1.4,
+  card: { width: CARD_WIDTH },
+  coverWrapper: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
     borderRadius: 8,
     overflow: "hidden",
-    marginBottom: 6,
+    marginBottom: 8,
+    position: "relative",
   },
-  coverImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
+  coverImage: { width: "100%", height: "100%", resizeMode: "cover" },
   coverPlaceholder: {
     width: "100%",
     height: "100%",
@@ -258,36 +301,35 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  coverEmoji: {
-    fontSize: 32,
+  coverEmoji: { fontSize: 36 },
+  fullBadge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    backgroundColor: "#2ecc71",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderBottomRightRadius: 6,
   },
-  bookTitle: {
+  fullBadgeText: { color: "#fff", fontSize: 9, fontWeight: "bold" },
+  cardTitle: {
     color: "#cccccc",
-    fontSize: 12,
-    lineHeight: 16,
+    fontSize: 13,
+    lineHeight: 18,
   },
 
-  // Full section
-  fullSection: {
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  fullGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginTop: 12,
-  },
-  fullCategoryBtn: {
-    width: "48%",
+  divider: {
+    height: 1,
     backgroundColor: "#1a1a1a",
-    borderRadius: 10,
-    paddingVertical: 18,
-    alignItems: "center",
+    marginHorizontal: 0,
   },
-  fullCategoryText: {
-    color: "#ffffff",
-    fontSize: 14,
-    fontWeight: "500",
+
+  emptySection: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  emptyText: {
+    color: "#555",
+    fontSize: 13,
   },
 });

@@ -25,6 +25,7 @@ export default function RootLayout() {
           options={{ presentation: "modal", title: "Modal" }}
         />
         <Stack.Screen name="category" options={{ headerShown: false }} />
+        <Stack.Screen name="trending" options={{ headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
     </ThemeProvider>

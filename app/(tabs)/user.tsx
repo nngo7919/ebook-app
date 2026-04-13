@@ -1,4 +1,9 @@
 import { Tabs } from "expo-router";
+import { Text } from "react-native";
+
+function TabIcon({ emoji }: { emoji: string }) {
+  return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
+}
 
 export default function TabLayout() {
   return (
@@ -9,19 +14,16 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: "#0d0d0d",
           borderTopColor: "#222",
-          height: 54,
+          height: 64,
         },
         tabBarItemStyle: {
           paddingVertical: 6,
+          flexDirection: "column",
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: "500",
-        },
-        tabBarIconStyle: {
-          display: "none",
-          width: 0,
-          height: 0,
+          marginTop: 2,
         },
         headerStyle: { backgroundColor: "#0d0d0d" },
         headerTintColor: "#ffffff",
@@ -32,7 +34,7 @@ export default function TabLayout() {
         options={{
           title: "Library",
           tabBarLabel: "Library",
-          tabBarIcon: () => null,
+          tabBarIcon: ({ color }) => <TabIcon emoji="🌐" />,
           headerShown: false,
         }}
       />
@@ -41,7 +43,7 @@ export default function TabLayout() {
         options={{
           title: "My Library",
           tabBarLabel: "My Library",
-          tabBarIcon: () => null,
+          tabBarIcon: ({ color }) => <TabIcon emoji="📥" />,
           headerShown: false,
         }}
       />
@@ -50,7 +52,7 @@ export default function TabLayout() {
         options={{
           title: "Menu",
           tabBarLabel: "Menu",
-          tabBarIcon: () => null,
+          tabBarIcon: ({ color }) => <TabIcon emoji="👤" />,
           headerShown: false,
         }}
       />

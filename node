@@ -1,4 +1,4 @@
-trang
+1. trang
 
 - trang sách :
 
@@ -34,7 +34,7 @@ trang
     nếu chọn chương trong mục lục sẽ chuyển sang chương đó
   - bấm nào nút mũi tên bên cạnh mục lục để chuyển snag chương tiếp theo
 
-library
+2.  library
 
 - mục đánh giá : dựa trên số lượng sao trung bình được tổng hợp từ số lượt đánh giá mà truyện được đánh giá ( 1 sao - 5 sao )
 - mục yêu thích: dựa trên số lượng thích
@@ -47,7 +47,9 @@ library
 - full đánh giá cao :có tag full và có lượt đánh giá nằm trong mức 4- 5 sao
 - full yêu thích :có tag full và có lượt thích cào
 - full xem nhiêu : có tag full và có lượt xem nhiều
-  my library
+
+3.  my library
+
 - đọc gần đây ; lịch sử đọc
   - khi bấm vào nút mũi tên thì sẽ hiện ra nhiều truyện hơn và trên cùng sẽ có thanh tìm kiếm ; thanh tìm kiếm chỉ tìm truyện trong lịch sử , nếu truyện tìm kiếm trong xuất hiện trong lịch sử thì không hiện
 - yêu thích gần đây : truyện được bấm thích gần nhất
@@ -59,40 +61,41 @@ library
 - dưới thanh kìm kiếm thì hiện các tag thể loại
 - thanh tìm kiếm có thể tìm tên truyện , thể loại truyện, tên tác giả
 - khi bấm vào 1 thể loại thì sẽ hiện thể loại đấy
-  user
 
-* trang cá nhân
+4.  user
 
-- bấm vào giới thiệu cá nhân thì có thể viết giới thiệu
-- bấm vào truyện của toi
+- trang cá nhân
+
+* bấm vào giới thiệu cá nhân thì có thể viết giới thiệu
+* bấm vào truyện của toi
   - upload truyện của mình lên public cho nhiều người đọc và có thể hiện lên trang library và tìm kiếm trong tag tìm kiếm
     - bấm vào upload thì chuyển sang trang upload
   - danh sách truyện : hiện danh sách truyện mà user đã upload
-- lịch sử
+* lịch sử
   - bấm vào truyện đã xem thì chuyển sang trang đọc gần đây
   - bấm vào truyện đã thích thì chuyển sang trang truyện đã thích
   - bấm vào truyện đã tải thì chuyển sang trang truyện đã tải
-- đăng xuất : thoát khỏi nick
+* đăng xuất : thoát khỏi nick
 
-* lịch sử trên tài khoản
+- lịch sử trên tài khoản
 
-- bấm vào truyện đã xem thì chuyển sang trang đọc gần đây
-- bấm vào truyện đã thích thì chuyển sang trang truyện đã thích
-- bấm vào truyện đã tải thì chuyển sang trang truyện đã tải
-- bấm vào truyện đã theo dõi thì chuyển sang trang truyện đã thoe dõi
-- bấm vào tác giả đã theo dõi thì chuyển sang trang tác giả đã theo dõi
+* bấm vào truyện đã xem thì chuyển sang trang đọc gần đây
+* bấm vào truyện đã thích thì chuyển sang trang truyện đã thích
+* bấm vào truyện đã tải thì chuyển sang trang truyện đã tải
+* bấm vào truyện đã theo dõi thì chuyển sang trang truyện đã thoe dõi
+* bấm vào tác giả đã theo dõi thì chuyển sang trang tác giả đã theo dõi
 
-* thông báo
+- thông báo
 
-- thông báo của tôi : kiểm tả xem trong mục truyện theo dõi có truyện nào đã update chương mới hoặc tác giả theo dõi có ra bộ truyện mới nào không , tác giả có update chương sách nào không
+* thông báo của tôi : kiểm tả xem trong mục truyện theo dõi có truyện nào đã update chương mới hoặc tác giả theo dõi có ra bộ truyện mới nào không , tác giả có update chương sách nào không
 
-* danh sách truyện
+- danh sách truyện
 
-- bộ sưu tập của tôi : hiện bộ sưu tập và có thể tạo bộ sưu tập
+* bộ sưu tập của tôi : hiện bộ sưu tập và có thể tạo bộ sưu tập
   - khi bấm vào danh sách thì chuyển trang trang sư tập
-- trang sưu tập thì hiện những bộ truyện bên trong bộ sưu tập đó
-- bộ sưu tập yêu thích : hiện những bộ sưu tập đã thích
-- bộ sưu tâp cộng đồng : hiện những bộ sưu tập của user khác những được họ chia sẻ lên
+* trang sưu tập thì hiện những bộ truyện bên trong bộ sưu tập đó
+* bộ sưu tập yêu thích : hiện những bộ sưu tập đã thích
+* bộ sưu tâp cộng đồng : hiện những bộ sưu tập của user khác những được họ chia sẻ lên
   trang upload
 
-* upload truyện hoặc upload audio
+- upload truyện hoặc upload audio

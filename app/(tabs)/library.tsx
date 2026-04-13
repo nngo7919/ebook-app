@@ -24,10 +24,10 @@ type Book = {
 };
 
 const QUICK_FILTERS = [
-  { icon: "⭐", label: "Đánh Giá" },
-  { icon: "❤️", label: "Yêu Thích" },
-  { icon: "📊", label: "Xem Nhiều" },
-  { icon: "📈", label: "Thịnh Hành" },
+  { icon: "⭐", label: "Đánh Giá", route: "category" },
+  { icon: "❤️", label: "Yêu Thích", route: "category" },
+  { icon: "📊", label: "Xem Nhiều", route: "category" },
+  { icon: "📈", label: "Thịnh Hành", route: "trending" },
 ];
 
 const FULL_CATEGORIES = [
@@ -119,12 +119,16 @@ export default function LibraryScreen() {
             <TouchableOpacity
               key={i}
               style={styles.quickFilterBtn}
-              onPress={() =>
-                router.push({
-                  pathname: "/category",
-                  params: { title: f.label },
-                })
-              }
+              onPress={() => {
+                if (f.route === "trending") {
+                  router.push("/trending");
+                } else {
+                  router.push({
+                    pathname: "/category",
+                    params: { title: f.label },
+                  });
+                }
+              }}
             >
               <Text style={styles.quickFilterIcon}>{f.icon}</Text>
               <Text style={styles.quickFilterLabel}>{f.label}</Text>
