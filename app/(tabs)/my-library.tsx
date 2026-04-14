@@ -180,7 +180,15 @@ export default function MyLibraryScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Đọc Gần Đây */}
-        <SectionHeader title="Đọc Gần Đây" />
+        <SectionHeader
+          title="Đang Đọc · Thiết Bị"
+          onPress={() =>
+            router.push({
+              pathname: "/book-list",
+              params: { type: "recent", title: "Đang Đọc · Thiết Bị" },
+            })
+          }
+        />
         {recentBooks.length === 0 ? (
           <EmptySection />
         ) : (
@@ -197,7 +205,15 @@ export default function MyLibraryScreen() {
         <View style={styles.divider} />
 
         {/* Yêu Thích Gần Đây */}
-        <SectionHeader title="Yêu Thích Gần Đây" />
+        <SectionHeader
+          title="Yêu Thích Gần Đây"
+          onPress={() =>
+            router.push({
+              pathname: "/book-list",
+              params: { type: "favorite", title: "Yêu Thích Gần Đây" },
+            })
+          }
+        />
         {favoriteBooks.length === 0 ? (
           <EmptySection />
         ) : (
@@ -214,7 +230,15 @@ export default function MyLibraryScreen() {
         <View style={styles.divider} />
 
         {/* Tải Gần Đây - Đọc Offline */}
-        <SectionHeader title="Tải Gần Đây - Đọc Offline" />
+        <SectionHeader
+          title="Tải Gần Đây - Đọc Offline"
+          onPress={() =>
+            router.push({
+              pathname: "/book-list",
+              params: { type: "download", title: "Tải Gần Đây - Đọc Offline" },
+            })
+          }
+        />
         {downloadedBooks.length === 0 ? (
           <EmptySection />
         ) : (

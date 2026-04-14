@@ -99,3 +99,20 @@
   trang upload
 
 - upload truyện hoặc upload audio
+
+5. tìm kiếm
+
+- thể loại
+  bấm vào thể loại nào thì sẽ đưa ra những ộ truyện trong thể loại đó
+  ở góc trn bên phải sẽ có 1 mục cho phép hiện thỉ theo :
+  - lượt xem
+  - đánh giá
+  - lượt tim
+  - thời gian ( cũ nhất hoặc mới nhất)
+- tìm truyện
+  sau khi nhập tên truyện rồi bấm tìm kiếm thì mới xuất hiện dannh sách truyện cùng tên hoặc có chữ giống như vây trong tên
+  sau bị tìm được truyện thì có 1 mục cho phép hiện thỉ theo :
+  - lượt xem
+  - đánh giá
+  - lượt tim
+  - thời gian ( cũ nhất hoặc mới nhất)

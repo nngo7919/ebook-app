@@ -29,12 +29,22 @@ export default function TabLayout() {
         headerTintColor: "#ffffff",
       }}
     >
+      <Tabs.Screen name="index" options={{ href: null }} />
       <Tabs.Screen
         name="library"
         options={{
           title: "Library",
           tabBarLabel: "Library",
           tabBarIcon: ({ color }) => <TabIcon emoji="🌐" />,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="search"
+        options={{
+          title: "Tìm Kiếm",
+          tabBarLabel: "Tìm Kiếm",
+          tabBarIcon: ({ color }) => <TabIcon emoji="🔍" />,
           headerShown: false,
         }}
       />
