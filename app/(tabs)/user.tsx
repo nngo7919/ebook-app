@@ -44,7 +44,10 @@ export default function UserScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Profile */}
-        <TouchableOpacity style={styles.profile}>
+        <TouchableOpacity
+          style={styles.profile}
+          onPress={() => router.push("/profile")}
+        >
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>👤</Text>
           </View>

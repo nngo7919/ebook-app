@@ -1,14 +1,17 @@
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-	FlatList,
-	StyleSheet,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	View,
+  FlatList,
+  Image,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { supabase } from "../../lib/supabase";
+
+const PINK = "#e91e8c";
 
 const TAGS = [
   "TYT",
@@ -46,9 +49,20 @@ type Book = {
   title: string;
   author: string;
   tag: string;
+  cover_url?: string;
+  total_chapters?: number;
+  genres?: string;
+  created_at?: string;
+  is_full?: boolean;
 };
 
 type Tab = "tag" | "search";
+
+function formatDate(dateStr?: string) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return `ngày ${d.getDate()} thg ${d.getMonth() + 1}, ${d.getFullYear()}`;
+}
 
 export default function SearchScreen() {
   const router = useRouter();
@@ -99,18 +113,68 @@ export default function SearchScreen() {
     );
   }
 
-  function SearchResults() {
+  function ResultItem({ item }: { item: Book }) {
+    const chapters =
+      item.total_chapters ?? Math.floor(Math.random() * 1500 + 50);
+    const isFull = item.is_full !== false;
+    const genres =
+      item.genres ??
+      (item.tag === "novel"
+        ? "Ngôn Tình · Cổ Đại · Điền Văn"
+        : "Kỹ Năng · Phát Triển Bản Thân");
+    const dateStr = formatDate(item.created_at);
+
+    return (
+      <TouchableOpacity
+        style={styles.resultItem}
+        onPress={() => router.push(`/reader/${item.id}`)}
+      >
+        <View style={styles.resultInfo}>
+          <Text style={styles.resultMeta}>
+            {dateStr ? `${dateStr}  ` : ""}
+            <Text style={styles.resultAuthor}>▸{item.author}</Text>
+          </Text>
+          <Text style={styles.resultTitle} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={styles.resultChapters}>
+            {chapters} chương{isFull ? "　【FULL】" : ""}
+          </Text>
+          <Text style={styles.resultGenres} numberOfLines={1}>
+            {genres}
+          </Text>
+        </View>
+
+        <View style={styles.coverWrapper}>
+          {item.cover_url ? (
+            <Image source={{ uri: item.cover_url }} style={styles.coverImage} />
+          ) : (
+            <View style={styles.coverPlaceholder}>
+              <Text style={{ fontSize: 26 }}>
+                {item.tag === "novel" ? "📖" : "📚"}
+              </Text>
+            </View>
+          )}
+          {isFull && (
+            <View style={styles.fullBadge}>
+              <Text style={styles.fullBadgeText}>FULL</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
+  function SearchContent() {
     if (!searched) {
       return (
         <View style={styles.hint}>
           <Text style={styles.hintText}>
-            Bạn có thể nhập tên truyện như:{"\n"}
-            me chong nha nong
+            Bạn có thể nhập tên truyện như:{"\n"}me chong nha nong
           </Text>
           <Text style={styles.hintText2}>
             Để tìm chính xác kết quả, bạn cần thêm dấu nháy {'" "'}
-            {"\n"}vào cụm từ như:{"\n"}
-            "me chong nha nong "
+            {"\n"}vào cụm từ như:{"\n"} " me chong nha nong "
           </Text>
           <TouchableOpacity>
             <Text style={styles.filterLink}>Tìm Với Bộ Lọc Truyện</Text>
@@ -139,25 +203,9 @@ export default function SearchScreen() {
       <FlatList
         data={results}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 24 }}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.resultItem}
-            onPress={() => router.push(`/reader/${item.id}`)}
-          >
-            <View style={styles.resultCover}>
-              <Text style={{ fontSize: 24 }}>
-                {item.tag === "novel" ? "📖" : "📚"}
-              </Text>
-            </View>
-            <View style={styles.resultInfo}>
-              <Text style={styles.resultTitle} numberOfLines={2}>
-                {item.title}
-              </Text>
-              <Text style={styles.resultAuthor}>{item.author}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
+        contentContainerStyle={{ paddingBottom: 80 }}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        renderItem={({ item }) => <ResultItem item={item} />}
       />
     );
   }
@@ -176,14 +224,14 @@ export default function SearchScreen() {
         )}
       </View>
 
-      {/* Search bar — chỉ hiện ở tab search */}
+      {/* Search bar */}
       {activeTab === "search" && (
         <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Text style={styles.searchIconText}>🔍</Text>
           <TextInput
             style={styles.searchInput}
             placeholder="Nhập tên truyện hoặc tác giả"
-            placeholderTextColor="#555"
+            placeholderTextColor="#444"
             value={query}
             onChangeText={handleSearch}
             autoFocus
@@ -196,19 +244,19 @@ export default function SearchScreen() {
                 setResults([]);
                 setSearched(false);
               }}
+              style={styles.clearCircle}
             >
-              <Text style={styles.clearBtn}>✕</Text>
+              <Text style={styles.clearCircleText}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
       )}
 
-      {/* Content */}
       <View style={{ flex: 1 }}>
-        {activeTab === "tag" ? <TagGrid /> : <SearchResults />}
+        {activeTab === "tag" ? <TagGrid /> : <SearchContent />}
       </View>
 
-      {/* Bottom sub-tabs */}
+      {/* Sub tab bar */}
       <View style={styles.subTabBar}>
         <TouchableOpacity
           style={styles.subTab}
@@ -217,7 +265,7 @@ export default function SearchScreen() {
           <Text
             style={[
               styles.subTabIcon,
-              activeTab === "tag" && styles.subTabIconActive,
+              activeTab === "tag" && styles.subTabActive,
             ]}
           >
             ⊞
@@ -238,7 +286,7 @@ export default function SearchScreen() {
           <Text
             style={[
               styles.subTabIcon,
-              activeTab === "search" && styles.subTabIconActive,
+              activeTab === "search" && styles.subTabActive,
             ]}
           >
             🔍
@@ -261,42 +309,40 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0d0d0d" },
 
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 16,
     paddingVertical: 14,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
     position: "relative",
   },
-  headerTitle: {
-    color: "#ffffff",
-    fontSize: 17,
-    fontWeight: "bold",
-  },
+  headerTitle: { color: "#ffffff", fontSize: 17, fontWeight: "bold" },
   filterIconBtn: { position: "absolute", right: 16 },
-  filterIcon: { color: "#4a9eff", fontSize: 22 },
+  filterIcon: { color: PINK, fontSize: 24 },
 
-  // Search bar
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#1a1a1a",
     marginHorizontal: 12,
-    marginBottom: 12,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    marginBottom: 8,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     gap: 8,
   },
-  searchIcon: { fontSize: 16 },
-  searchInput: {
-    flex: 1,
-    color: "#ffffff",
-    fontSize: 15,
+  searchIconText: { fontSize: 16 },
+  searchInput: { flex: 1, color: "#ffffff", fontSize: 16 },
+  clearCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "#444",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  clearBtn: { color: "#555", fontSize: 16, paddingHorizontal: 4 },
+  clearCircleText: { color: "#fff", fontSize: 11, fontWeight: "bold" },
 
-  // Tag grid
   tagGrid: { padding: 12, paddingBottom: 24 },
   tagRow: { gap: 12, marginBottom: 12 },
   tagBtn: {
@@ -310,7 +356,54 @@ const styles = StyleSheet.create({
   },
   tagText: { color: "#ffffff", fontSize: 15, fontWeight: "500" },
 
-  // Search results
+  resultItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  resultInfo: { flex: 1 },
+  resultMeta: { color: "#666", fontSize: 12, marginBottom: 4 },
+  resultAuthor: { color: "#666", fontSize: 12 },
+  resultTitle: {
+    color: PINK,
+    fontSize: 16,
+    fontWeight: "600",
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  resultChapters: { color: "#888", fontSize: 13, marginBottom: 3 },
+  resultGenres: { color: "#666", fontSize: 12 },
+
+  coverWrapper: {
+    width: 76,
+    height: 104,
+    borderRadius: 6,
+    overflow: "hidden",
+    position: "relative",
+    flexShrink: 0,
+  },
+  coverImage: { width: "100%", height: "100%", resizeMode: "cover" },
+  coverPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#1e1e1e",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fullBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    backgroundColor: "#2ecc71",
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderBottomLeftRadius: 6,
+  },
+  fullBadgeText: { color: "#fff", fontSize: 9, fontWeight: "bold" },
+  separator: { height: 1, backgroundColor: "#1a1a1a", marginHorizontal: 16 },
+
   hint: {
     flex: 1,
     alignItems: "center",
@@ -330,51 +423,17 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 22,
   },
-  filterLink: {
-    color: "#4a9eff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  resultItem: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1a1a1a",
-  },
-  resultCover: {
-    width: 50,
-    height: 70,
-    backgroundColor: "#1e1e1e",
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  resultInfo: { flex: 1, justifyContent: "center" },
-  resultTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 4,
-  },
-  resultAuthor: { color: "#888", fontSize: 13 },
+  filterLink: { color: PINK, fontSize: 16, fontWeight: "600" },
 
-  // Sub tab bar
   subTabBar: {
     flexDirection: "row",
     borderTopWidth: 1,
     borderTopColor: "#1a1a1a",
     backgroundColor: "#0d0d0d",
   },
-  subTab: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 10,
-    gap: 4,
-  },
+  subTab: { flex: 1, alignItems: "center", paddingVertical: 10, gap: 4 },
   subTabIcon: { fontSize: 20, color: "#555" },
-  subTabIconActive: { color: "#4a9eff" },
+  subTabActive: { color: PINK },
   subTabLabel: { fontSize: 11, color: "#555", fontWeight: "500" },
-  subTabLabelActive: { color: "#4a9eff" },
+  subTabLabelActive: { color: PINK },
 });
