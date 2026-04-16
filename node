@@ -1,6 +1,7 @@
 1. trang
 
 - trang sách :
+  list - book-detail- reader
 
 * hiện tên tác giả : bấm vào tác gỉa thì chuyển sang trang tác giả
 * hiện thể loại
@@ -13,6 +14,7 @@
     - đã xuất hiện tronh lịch sử đọc thì bắt đầu ở trang đang đọc
 * bấm vào mục lục + hiện chương 1 đầu tiên + bấm vào chương nào thì sẽ chuyển sang trang reader của chương đó
 * bấm vào mục tải về thì sẽ tải truyện về mục tỉa gần đây trong my library
+* có phần đánh giá và comment của người đọc
 
 - trang tác giả
 
@@ -116,3 +118,23 @@
   - đánh giá
   - lượt tim
   - thời gian ( cũ nhất hoặc mới nhất)
+  6. đăng nhập / đăng xuất
+     🔹 Khi KHÔNG đăng nhập
+
+     Bạn vẫn có thể:
+
+     Xem danh sách truyện
+     Vào đọc nội dung
+     Tìm kiếm truyện
+
+     👉 Đây gọi là guest mode (anonymous user)
+
+     🔹 Khi đăng nhập
+
+     Mở khóa thêm:
+
+     Lưu truyện vào thư viện
+     Like / comment
+     Theo dõi tác giả
+     Đồng bộ dữ liệu giữa thiết bị
+     Lịch sử đọc
