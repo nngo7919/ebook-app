@@ -63,7 +63,9 @@ export default function LibraryScreen() {
     return (
       <TouchableOpacity
         style={styles.bookCard}
-        onPress={() => router.push(`/reader/${item.id}`)}
+        onPress={() =>
+          router.push({ pathname: "/book/[id]", params: { id: item.id } })
+        }
       >
         <View style={styles.bookCover}>
           {item.cover_url ? (

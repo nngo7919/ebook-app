@@ -1,15 +1,15 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-	Alert,
-	FlatList,
-	Image,
-	SafeAreaView,
-	StyleSheet,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	View,
+  Alert,
+  FlatList,
+  Image,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -97,7 +97,12 @@ export default function BookListScreen() {
     return (
       <TouchableOpacity
         style={styles.item}
-        onPress={() => router.push(`/reader/${item.book_id || item.id}`)}
+        onPress={() =>
+          router.push({
+            pathname: "/book/[id]",
+            params: { id: item.book_id || item.id },
+          })
+        }
       >
         <View style={styles.info}>
           <Text style={styles.itemTitle} numberOfLines={2}>

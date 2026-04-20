@@ -1,14 +1,14 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-	Dimensions,
-	FlatList,
-	Image,
-	SafeAreaView,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+  Dimensions,
+  FlatList,
+  Image,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { supabase } from "../lib/supabase";
 
@@ -50,7 +50,9 @@ export default function CategoryScreen() {
     return (
       <TouchableOpacity
         style={styles.card}
-        onPress={() => router.push(`/reader/${item.id}`)}
+        onPress={() =>
+          router.push({ pathname: "/book/[id]", params: { id: item.id } })
+        }
       >
         {/* Cover */}
         <View style={styles.coverWrapper}>

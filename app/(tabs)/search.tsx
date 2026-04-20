@@ -127,7 +127,9 @@ export default function SearchScreen() {
     return (
       <TouchableOpacity
         style={styles.resultItem}
-        onPress={() => router.push(`/reader/${item.id}`)}
+        onPress={() =>
+          router.push({ pathname: "/book/[id]", params: { id: item.id } })
+        }
       >
         <View style={styles.resultInfo}>
           <Text style={styles.resultMeta}>
@@ -174,7 +176,7 @@ export default function SearchScreen() {
           </Text>
           <Text style={styles.hintText2}>
             Để tìm chính xác kết quả, bạn cần thêm dấu nháy {'" "'}
-            {"\n"}vào cụm từ như:{"\n"} " me chong nha nong "
+            {"\n"}vào cụm từ như:{"\n"} "me chong nha nong"
           </Text>
           <TouchableOpacity>
             <Text style={styles.filterLink}>Tìm Với Bộ Lọc Truyện</Text>
