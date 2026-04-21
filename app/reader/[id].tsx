@@ -1,4 +1,14 @@
+import {
+  books as booksApi,
+  chapters as chaptersApi,
+  progress as progressApi,
+} from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
+import {
+  DEFAULT_READER_SETTINGS,
+  type Chapter,
+  type ReaderSettings,
+} from "@/app/lib/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,38 +22,9 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import {
-  books as booksApi,
-  chapters as chaptersApi,
-  progress as progressApi,
-} from "../lib/api";
 
 const PINK = "#e91e8c";
 const { width } = Dimensions.get("window");
-
-type Settings = {
-  bgColor: string;
-  textColor: string;
-  fontSize: number;
-  lineHeight: number;
-  readMode: "scroll" | "page" | "combined";
-};
-
-type Chapter = {
-  id: string;
-  chapter_number: number;
-  title: string;
-  content: string;
-  created_at?: string;
-};
-
-const DEFAULT_SETTINGS: Settings = {
-  bgColor: "#0d0d0d",
-  textColor: "#e0e0e0",
-  fontSize: 19,
-  lineHeight: 1.6,
-  readMode: "combined",
-};
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "";
@@ -67,7 +48,9 @@ export default function ReaderScreen() {
   const [chapterData, setChapterData] = useState<Chapter | null>(null);
   const [loading, setLoading] = useState(true);
   const [showControls, setShowControls] = useState(true);
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<ReaderSettings>(
+    DEFAULT_READER_SETTINGS,
+  );
   const [scrollProgress, setScrollProgress] = useState(0);
 
   const scrollRef = useRef<ScrollView>(null);
@@ -77,7 +60,7 @@ export default function ReaderScreen() {
   // Load settings
   useEffect(() => {
     AsyncStorage.getItem("reader_settings").then((val) => {
-      if (val) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(val) });
+      if (val) setSettings({ ...DEFAULT_READER_SETTINGS, ...JSON.parse(val) });
     });
   }, []);
 
@@ -111,10 +94,13 @@ export default function ReaderScreen() {
       // Fallback content khi chưa có data
       setChapterData({
         id: `fake-${num}`,
+        book_id: id,
         chapter_number: num,
         title: `Chương ${num}`,
         content: `Lão phu bấm ngón tay tính toán, hiện giờ người đang nằm trên giường xem tiểu thuyết, lại còn nằm nghiêng, có khi điện thoại còn đang sạc pin.\n\nDương Gian, cậu học sinh lớp 12, lúc này đang nằm trong chăn, buồn chán lướt điện thoại. Hắn tiện tay mở một bài viết, bên dưới có rất nhiều bình luận của cư dân mạng.\n\n"Thánh thật sự, chủ thớt đoán trúng phóc luôn."\n\n"Mọi người biết tôi đang đi vệ sinh không?"\n\nDương Gian lắc đầu cười, tiếp tục cuộn xuống đọc thêm. Bên ngoài cửa sổ, tiếng gió thổi xào xạc qua những tán lá xanh.`,
+        word_count: 0,
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
     }
     setLoading(false);

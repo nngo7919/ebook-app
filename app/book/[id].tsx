@@ -69,7 +69,37 @@ export default function BookDetailScreen() {
   async function fetchBook() {
     setLoading(true);
     const { data } = await booksApi.get(id);
-    setBook(data ?? null);
+    if (data) {
+      setBook(data);
+    } else {
+      // Fake data để test UI khi chưa có Supabase
+      setBook({
+        id,
+        title: "Trọng Sinh Trong Sách Pháo Hôi Học Tra Người Qua Đường Giáp",
+        author: "tntytn",
+        cover_url: null,
+        description:
+          "Dương Gian trọng sinh vào trong cuốn sách ngôn tình mà mình đã đọc, trở thành nhân vật phụ vô danh. Hắn quyết định sống thật tốt, không can thiệp vào plot chính... nhưng số phận lại không để hắn yên.",
+        tag: "novel",
+        genres: "Ngôn Tình, Hiện Đại, HE, Xuyên Thư, Vườn Trường, NP, Hài Hước",
+        total_chapters: 17,
+        is_full: false,
+        views: 101,
+        likes: 57,
+        editor: "tntytn",
+        created_at: new Date(Date.now() - 3 * 60000).toISOString(),
+        updated_at: new Date().toISOString(),
+        genres_list: [
+          "Ngôn Tình",
+          "Hiện Đại",
+          "HE",
+          "Xuyên Thư",
+          "Vườn Trường",
+          "NP",
+          "Hài Hước",
+        ],
+      });
+    }
     setLoading(false);
   }
 

@@ -30,6 +30,111 @@ const FULL_CATEGORIES = [
   { label: "Full – Xem Nhiều" },
 ];
 
+const FAKE_BOOKS: Book[] = [
+  {
+    id: "1",
+    title: "Khủng Bố Sống Lại",
+    author: "Phát Tiểu Tiểu Tiêu",
+    cover_url: null,
+    description: null,
+    tag: "novel",
+    genres: "Kinh Dị, Hành Động",
+    genres_list: ["Kinh Dị", "Hành Động"],
+    total_chapters: 1606,
+    is_full: true,
+    views: 9800,
+    likes: 432,
+    editor: null,
+    created_at: new Date(Date.now() - 1 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    title: "Trọng Sinh Trong Sách Pháo Hôi Học Tra Người Qua Đường Giáp",
+    author: "tntytn",
+    cover_url: null,
+    description: null,
+    tag: "novel",
+    genres: "Ngôn Tình, Hiện Đại, HE",
+    genres_list: ["Ngôn Tình", "Hiện Đại", "HE"],
+    total_chapters: 17,
+    is_full: false,
+    views: 101,
+    likes: 57,
+    editor: null,
+    created_at: new Date(Date.now() - 2 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "3",
+    title: "Xuyên Thành Nông Nữ, Được Cả Nhà Cưng",
+    author: "Viện Kinh Phong",
+    cover_url: null,
+    description: null,
+    tag: "novel",
+    genres: "Ngôn Tình, Cổ Đại, Điền Văn",
+    genres_list: ["Ngôn Tình", "Cổ Đại", "Điền Văn"],
+    total_chapters: 270,
+    is_full: true,
+    views: 5400,
+    likes: 211,
+    editor: null,
+    created_at: new Date(Date.now() - 3 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "4",
+    title: "Tổng Tài Lạnh Lùng Yêu Vợ Ngọt",
+    author: "Nguyệt Dạ Hồng Liên",
+    cover_url: null,
+    description: null,
+    tag: "novel",
+    genres: "Ngôn Tình, Hiện Đại, Tổng Tài",
+    genres_list: ["Ngôn Tình", "Hiện Đại", "Tổng Tài"],
+    total_chapters: 374,
+    is_full: true,
+    views: 7200,
+    likes: 318,
+    editor: null,
+    created_at: new Date(Date.now() - 4 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "5",
+    title: "Sau Khi Bắt Được Chồng Quân Nhân",
+    author: "Đại Nguyên Từ Nha",
+    cover_url: null,
+    description: null,
+    tag: "novel",
+    genres: "Ngôn Tình, Đô Thị, Niên Đại",
+    genres_list: ["Ngôn Tình", "Đô Thị", "Niên Đại"],
+    total_chapters: 292,
+    is_full: true,
+    views: 6100,
+    likes: 274,
+    editor: null,
+    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: "6",
+    title: "Đọa Lạc Thiên Tài Nữ Y",
+    author: "Thanh Vân Mặc",
+    cover_url: null,
+    description: null,
+    tag: "novel",
+    genres: "Tiên Hiệp, Nữ Cường, Huyền Huyễn",
+    genres_list: ["Tiên Hiệp", "Nữ Cường", "Huyền Huyễn"],
+    total_chapters: 880,
+    is_full: true,
+    views: 12300,
+    likes: 567,
+    editor: null,
+    created_at: new Date(Date.now() - 6 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
 export default function LibraryScreen() {
   const router = useRouter();
   const [newBooks, setNewBooks] = useState<Book[]>([]);
@@ -43,7 +148,7 @@ export default function LibraryScreen() {
   async function fetchBooks() {
     setLoading(true);
     const { data } = await booksApi.list({ orderBy: "created_at", limit: 12 });
-    const all = data || [];
+    const all = data && data.length > 0 ? data : FAKE_BOOKS;
     setNewBooks(all.slice(0, 6));
     setUpdatedBooks(all.slice(0, 6));
     setLoading(false);
