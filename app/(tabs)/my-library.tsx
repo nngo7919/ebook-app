@@ -4,6 +4,7 @@ import {
   progress as progressApi,
 } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
+import { FAKE_LIBRARY_ITEMS, FAKE_MY_BOOKS } from "@/app/lib/fake-data";
 import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -44,49 +45,63 @@ export default function MyLibraryScreen() {
   const [loading, setLoading] = useState(true);
 
   async function fetchMyBooks() {
-    if (!user) return;
     setLoading(true);
 
     // Đọc gần đây
-    const { data: recentData } = await progressApi.recentBooks(user.id, 6);
-    setRecentBooks(
-      (recentData ?? []).map((r) => ({
-        id: r.book_id,
-        title: r.book.title,
-        author: r.book.author,
-        tag: r.book.tag,
-        source: "download" as const,
-        book_id: r.book_id,
-        cover_url: r.book.cover_url ?? undefined,
-      })),
-    );
+    const recentResult = user
+      ? await progressApi.recentBooks(user.id, 6)
+      : { data: null };
+    const recentMapped = (recentResult.data ?? []).map((r) => ({
+      id: r.book_id,
+      title: r.book.title,
+      author: r.book.author,
+      tag: r.book.tag,
+      source: "download" as const,
+      book_id: r.book_id,
+      cover_url: r.book.cover_url ?? undefined,
+    }));
+    setRecentBooks(recentMapped.length > 0 ? recentMapped : FAKE_MY_BOOKS);
 
     // Yêu thích
-    const { data: favData } = await favApi.list(user.id);
+    const favResult = user ? await favApi.list(user.id) : { data: null };
+    const favMapped = (favResult.data ?? []).slice(0, 6).map((b) => ({
+      id: b.id,
+      title: b.title,
+      author: b.author,
+      tag: b.tag,
+      source: "download" as const,
+      book_id: b.id,
+      cover_url: b.cover_url ?? undefined,
+    }));
     setFavoriteBooks(
-      (favData ?? []).slice(0, 6).map((b) => ({
-        id: b.id,
-        title: b.title,
-        author: b.author,
-        tag: b.tag,
-        source: "download" as const,
-        book_id: b.id,
-        cover_url: b.cover_url ?? undefined,
-      })),
+      favMapped.length > 0 ? favMapped : FAKE_MY_BOOKS.slice(0, 3),
     );
 
     // Đã tải
-    const { data: dlData } = await libApi.list(user.id, { source: "download" });
+    const dlResult = user
+      ? await libApi.list(user.id, { source: "download" })
+      : { data: null };
+    const dlMapped = (dlResult.data ?? []).slice(0, 6).map((item) => ({
+      id: item.id,
+      title: item.title,
+      author: item.author,
+      tag: item.tag,
+      source: item.source,
+      book_id: item.book_id ?? item.id,
+      cover_url: item.cover_url ?? undefined,
+    }));
     setDownloadedBooks(
-      (dlData ?? []).slice(0, 6).map((item) => ({
-        id: item.id,
-        title: item.title,
-        author: item.author,
-        tag: item.tag,
-        source: item.source,
-        book_id: item.book_id ?? item.id,
-        cover_url: item.cover_url ?? undefined,
-      })),
+      dlMapped.length > 0
+        ? dlMapped
+        : FAKE_LIBRARY_ITEMS.map((item) => ({
+            id: item.id,
+            title: item.title,
+            author: item.author,
+            tag: item.tag,
+            source: item.source,
+            book_id: item.book_id ?? item.id,
+            cover_url: item.cover_url ?? undefined,
+          })),
     );
 
     setLoading(false);
@@ -94,7 +109,7 @@ export default function MyLibraryScreen() {
 
   useEffect(() => {
     fetchMyBooks();
-  }, [user]);
+  }, [user]); // eslint-disable-line
 
   async function handleUpload() {
     if (!user) {

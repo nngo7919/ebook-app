@@ -1,5 +1,6 @@
 import { books as booksApi, favorites as favApi } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
+import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -23,29 +24,6 @@ function formatMinutes(dateStr?: string) {
   if (diff < 1440) return `${Math.floor(diff / 60)} giờ`;
   return `${Math.floor(diff / 1440)} ngày`;
 }
-
-const FAKE_TAGS = [
-  "Ngôn Tình",
-  "Hiện Đại",
-  "HE",
-  "Xuyên Thư",
-  "Vườn Trường",
-  "NP",
-  "Hài Hước",
-];
-const FAKE_GENRES = [
-  "Nguyên sang",
-  "Ngôn tình",
-  "Hiện đại",
-  "HE",
-  "Tình cảm",
-  "Ngọt văn",
-  "Xuyên thư",
-  "Vườn trường",
-  "NP",
-  "Nhẹ nhàng",
-  "Hài hước",
-];
 
 export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -72,33 +50,9 @@ export default function BookDetailScreen() {
     if (data) {
       setBook(data);
     } else {
-      // Fake data để test UI khi chưa có Supabase
-      setBook({
-        id,
-        title: "Trọng Sinh Trong Sách Pháo Hôi Học Tra Người Qua Đường Giáp",
-        author: "tntytn",
-        cover_url: null,
-        description:
-          "Dương Gian trọng sinh vào trong cuốn sách ngôn tình mà mình đã đọc, trở thành nhân vật phụ vô danh. Hắn quyết định sống thật tốt, không can thiệp vào plot chính... nhưng số phận lại không để hắn yên.",
-        tag: "novel",
-        genres: "Ngôn Tình, Hiện Đại, HE, Xuyên Thư, Vườn Trường, NP, Hài Hước",
-        total_chapters: 17,
-        is_full: false,
-        views: 101,
-        likes: 57,
-        editor: "tntytn",
-        created_at: new Date(Date.now() - 3 * 60000).toISOString(),
-        updated_at: new Date().toISOString(),
-        genres_list: [
-          "Ngôn Tình",
-          "Hiện Đại",
-          "HE",
-          "Xuyên Thư",
-          "Vườn Trường",
-          "NP",
-          "Hài Hước",
-        ],
-      });
+      // Fake data — tìm trong FAKE_BOOKS theo id, nếu không có dùng phần tử đầu
+      const fake = FAKE_BOOKS.find((b) => b.id === id) ?? FAKE_BOOKS[0];
+      setBook({ ...fake, id });
     }
     setLoading(false);
   }
@@ -138,10 +92,10 @@ export default function BookDetailScreen() {
   const ago = formatMinutes(book.created_at);
   const tags = book.genres
     ? book.genres.split(",").map((g) => g.trim())
-    : FAKE_TAGS;
+    : (book?.genres_list ?? []);
   const allGenres = book.genres
     ? book.genres.split(",").map((g) => g.trim())
-    : FAKE_GENRES;
+    : (book?.genres_list ?? []);
   const shortTitle =
     book.title.length > 18 ? book.title.slice(0, 18) + "..." : book.title;
 
