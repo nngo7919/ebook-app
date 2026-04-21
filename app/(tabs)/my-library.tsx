@@ -1,3 +1,9 @@
+import {
+  favorites as favApi,
+  library as libApi,
+  progress as progressApi,
+} from "@/app/lib/api";
+import { useAuth } from "@/app/lib/auth";
 import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -13,7 +19,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = 140;
@@ -31,6 +36,7 @@ type MyBook = {
 
 export default function MyLibraryScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [recentBooks, setRecentBooks] = useState<MyBook[]>([]);
   const [favoriteBooks, setFavoriteBooks] = useState<MyBook[]>([]);
   const [downloadedBooks, setDownloadedBooks] = useState<MyBook[]>([]);
@@ -38,25 +44,82 @@ export default function MyLibraryScreen() {
   const [loading, setLoading] = useState(true);
 
   async function fetchMyBooks() {
+    if (!user) return;
     setLoading(true);
-    const { data } = await supabase
-      .from("user_library")
-      .select("*")
-      .eq("user_id", "local-user")
-      .order("created_at", { ascending: false });
 
-    const all = data || [];
-    setRecentBooks(all.slice(0, 6));
-    setFavoriteBooks(all.slice(0, 6));
-    setDownloadedBooks(all.filter((b) => b.source === "download").slice(0, 6));
+    // Đọc gần đây
+    const { data: recentData } = await progressApi.recentBooks(user.id, 6);
+    setRecentBooks(
+      (recentData ?? []).map((r) => ({
+        id: r.book_id,
+        title: r.book.title,
+        author: r.book.author,
+        tag: r.book.tag,
+        source: "download" as const,
+        book_id: r.book_id,
+        cover_url: r.book.cover_url ?? undefined,
+      })),
+    );
+
+    // Yêu thích
+    const { data: favData } = await favApi.list(user.id);
+    setFavoriteBooks(
+      (favData ?? []).slice(0, 6).map((b) => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        tag: b.tag,
+        source: "download" as const,
+        book_id: b.id,
+        cover_url: b.cover_url ?? undefined,
+      })),
+    );
+
+    // Đã tải
+    const { data: dlData } = await libApi.list(user.id, { source: "download" });
+    setDownloadedBooks(
+      (dlData ?? []).slice(0, 6).map((item) => ({
+        id: item.id,
+        title: item.title,
+        author: item.author,
+        tag: item.tag,
+        source: item.source,
+        book_id: item.book_id ?? item.id,
+        cover_url: item.cover_url ?? undefined,
+      })),
+    );
+
     setLoading(false);
   }
 
   useEffect(() => {
     fetchMyBooks();
-  }, []);
+  }, [user]);
 
   async function handleUpload() {
+    if (!user) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để tải truyện.");
+      return;
+    }
+
+    const doUpload = async (fileName: string, filePath: string) => {
+      setUploading(true);
+      const { error } = await libApi.add(user.id, {
+        source: "upload",
+        title: fileName,
+        author: "Không rõ",
+        tag: "book",
+        file_path: filePath,
+      });
+      setUploading(false);
+      if (error) {
+        Alert.alert("Lỗi", error);
+      } else {
+        Alert.alert("✅ Thành công", `Đã thêm "${fileName}"`);
+        fetchMyBooks();
+      }
+    };
+
     if (Platform.OS === "web") {
       const input = document.createElement("input");
       input.type = "file";
@@ -64,23 +127,7 @@ export default function MyLibraryScreen() {
       input.onchange = async (e: any) => {
         const file = e.target.files[0];
         if (!file) return;
-        const fileName = file.name.replace(/\.[^/.]+$/, "");
-        setUploading(true);
-        const { error } = await supabase.from("user_library").insert({
-          user_id: "local-user",
-          source: "upload",
-          title: fileName,
-          author: "Không rõ",
-          tag: "book",
-          file_path: file.name,
-        });
-        setUploading(false);
-        if (error) {
-          Alert.alert("Lỗi", error.message);
-        } else {
-          Alert.alert("✅ Thành công", `Đã thêm "${fileName}"`);
-          fetchMyBooks();
-        }
+        await doUpload(file.name.replace(/\.[^/.]+$/, ""), file.name);
       };
       input.click();
     } else {
@@ -91,23 +138,7 @@ export default function MyLibraryScreen() {
         });
         if (result.canceled) return;
         const file = result.assets[0];
-        const fileName = file.name.replace(/\.[^/.]+$/, "");
-        setUploading(true);
-        const { error } = await supabase.from("user_library").insert({
-          user_id: "local-user",
-          source: "upload",
-          title: fileName,
-          author: "Không rõ",
-          tag: "book",
-          file_path: file.uri,
-        });
-        setUploading(false);
-        if (error) {
-          Alert.alert("Lỗi", error.message);
-        } else {
-          Alert.alert("✅ Thành công", `Đã thêm "${fileName}"`);
-          fetchMyBooks();
-        }
+        await doUpload(file.name.replace(/\.[^/.]+$/, ""), file.uri);
       } catch {
         setUploading(false);
       }

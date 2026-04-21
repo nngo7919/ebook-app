@@ -1,34 +1,20 @@
+import { books as booksApi, favorites as favApi } from "@/app/lib/api";
+import { useAuth } from "@/app/lib/auth";
+import type { Book } from "@/app/lib/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-	Alert,
-	Image,
-	SafeAreaView,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
 
 const PINK = "#e91e8c";
-
-type Book = {
-  id: string;
-  title: string;
-  author: string;
-  tag: string;
-  cover_url?: string;
-  total_chapters?: number;
-  genres?: string;
-  created_at?: string;
-  is_full?: boolean;
-  likes?: number;
-  views?: number;
-  editor?: string;
-  description?: string;
-};
 
 function formatMinutes(dateStr?: string) {
   if (!dateStr) return "vài phút";
@@ -64,6 +50,7 @@ const FAKE_GENRES = [
 export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { user } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
@@ -72,15 +59,27 @@ export default function BookDetailScreen() {
     fetchBook();
   }, [id]);
 
+  // Check favorite status when user available
+  useEffect(() => {
+    if (user && id) {
+      favApi.check(user.id, id).then(({ data }) => setLiked(!!data));
+    }
+  }, [user, id]);
+
   async function fetchBook() {
     setLoading(true);
-    const { data } = await supabase
-      .from("books")
-      .select("*")
-      .eq("id", id)
-      .single();
-    setBook(data);
+    const { data } = await booksApi.get(id);
+    setBook(data ?? null);
     setLoading(false);
+  }
+
+  async function handleToggleLike() {
+    if (!user) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để thích truyện.");
+      return;
+    }
+    const { data: newState } = await favApi.toggle(user.id, id);
+    if (newState !== null) setLiked(newState);
   }
 
   if (loading) {

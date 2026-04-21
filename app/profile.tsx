@@ -1,11 +1,12 @@
+import { useAuth } from "@/app/lib/auth";
 import { useRouter } from "expo-router";
 import {
-	Alert,
-	SafeAreaView,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+  Alert,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const PINK = "#e91e8c";
@@ -70,6 +71,10 @@ const SECTIONS = [
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const { profile, user, signOut } = useAuth();
+
+  const displayName = profile?.display_name ?? user?.email ?? "Người dùng";
+  const avatarLetter = displayName.charAt(0).toUpperCase();
 
   function handlePress(item: any) {
     if (item.route) {
@@ -82,7 +87,10 @@ export default function ProfileScreen() {
         {
           text: "Đăng xuất",
           style: "destructive",
-          onPress: () => router.back(),
+          onPress: async () => {
+            await signOut();
+            router.replace("/auth/login");
+          },
         },
       ]);
     }

@@ -1,3 +1,5 @@
+import { books as booksApi } from "@/app/lib/api";
+import type { Book } from "@/app/lib/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -10,21 +12,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { supabase } from "../lib/supabase";
 
 const { width } = Dimensions.get("window");
 const CARD_WIDTH = (width - 48) / 3;
 const CARD_HEIGHT = CARD_WIDTH * 1.45;
-
-type Book = {
-  id: string;
-  title: string;
-  author: string;
-  tag: "novel" | "book";
-  cover_url?: string;
-  views?: number;
-  rating?: number;
-};
 
 export default function CategoryScreen() {
   const { title } = useLocalSearchParams<{ title: string }>();
@@ -38,10 +29,10 @@ export default function CategoryScreen() {
 
   async function fetchBooks() {
     setLoading(true);
-    const { data } = await supabase
-      .from("books")
-      .select("*")
-      .order("created_at", { ascending: false });
+    // Nếu có title (genre), tìm theo genre; nếu không lấy tất cả
+    const { data } = title
+      ? await booksApi.byGenre(title)
+      : await booksApi.list();
     setBooks(data || []);
     setLoading(false);
   }
@@ -79,7 +70,6 @@ export default function CategoryScreen() {
           <Text style={styles.metaText}>
             © {item.views ?? Math.floor(Math.random() * 2000 + 100)}
           </Text>
-          <Text style={styles.metaText}>☆ {item.rating ?? "5.0"}</Text>
         </View>
       </TouchableOpacity>
     );

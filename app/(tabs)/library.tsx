@@ -1,3 +1,5 @@
+import { books as booksApi } from "@/app/lib/api";
+import type { Book } from "@/app/lib/types";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -10,18 +12,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
 
 const { width } = Dimensions.get("window");
 const BOOK_CARD_WIDTH = (width - 48) / 3.5;
-
-type Book = {
-  id: string;
-  title: string;
-  author: string;
-  tag: "novel" | "book";
-  cover_url?: string;
-};
 
 const QUICK_FILTERS = [
   { icon: "⭐", label: "Đánh Giá", route: "category" },
@@ -49,10 +42,7 @@ export default function LibraryScreen() {
 
   async function fetchBooks() {
     setLoading(true);
-    const { data } = await supabase
-      .from("books")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data } = await booksApi.list({ orderBy: "created_at", limit: 12 });
     const all = data || [];
     setNewBooks(all.slice(0, 6));
     setUpdatedBooks(all.slice(0, 6));

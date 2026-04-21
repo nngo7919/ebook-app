@@ -1,3 +1,9 @@
+import {
+  favorites as favApi,
+  library as libApi,
+  progress as progressApi,
+} from "@/app/lib/api";
+import { useAuth } from "@/app/lib/auth";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -11,7 +17,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { supabase } from "../lib/supabase";
 
 type MyBook = {
   id: string;
@@ -27,6 +32,7 @@ type MyBook = {
 
 export default function BookListScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const { type, title } = useLocalSearchParams<{
     type: string;
     title: string;
@@ -39,22 +45,53 @@ export default function BookListScreen() {
 
   useEffect(() => {
     fetchBooks();
-  }, [type]);
+  }, [type, user]);
 
   async function fetchBooks() {
+    if (!user) return;
     setLoading(true);
-    let q = supabase
-      .from("user_library")
-      .select("*")
-      .eq("user_id", "local-user")
-      .order("created_at", { ascending: false });
 
-    if (type === "download") {
-      q = q.eq("source", "download");
+    let books: MyBook[] = [];
+
+    if (type === "favorite") {
+      const { data } = await favApi.list(user.id);
+      books = (data ?? []).map((b) => ({
+        id: b.id,
+        title: b.title,
+        author: b.author,
+        tag: b.tag,
+        source: "download" as const,
+        book_id: b.id,
+        cover_url: b.cover_url ?? undefined,
+      }));
+    } else if (type === "recent") {
+      const { data } = await progressApi.recentBooks(user.id);
+      books = (data ?? []).map((r) => ({
+        id: r.book_id,
+        title: r.book.title,
+        author: r.book.author,
+        tag: r.book.tag,
+        source: "download" as const,
+        book_id: r.book_id,
+        cover_url: r.book.cover_url ?? undefined,
+        current_chapter: r.chapter_number,
+      }));
+    } else {
+      const { data } = await libApi.list(user.id, {
+        source: type === "download" ? "download" : undefined,
+      });
+      books = (data ?? []).map((item) => ({
+        id: item.id,
+        title: item.title,
+        author: item.author,
+        tag: item.tag,
+        source: item.source,
+        book_id: item.book_id ?? item.id,
+        cover_url: item.cover_url ?? undefined,
+        current_chapter: item.current_chapter,
+      }));
     }
 
-    const { data } = await q;
-    const books = data || [];
     setAllBooks(books);
     setFiltered(books);
     setLoading(false);

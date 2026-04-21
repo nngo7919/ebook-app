@@ -1,3 +1,4 @@
+import { useAuth } from "@/app/lib/auth";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -11,7 +12,11 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
+import {
+  books as booksApi,
+  chapters as chaptersApi,
+  progress as progressApi,
+} from "../lib/api";
 
 const PINK = "#e91e8c";
 const { width } = Dimensions.get("window");
@@ -52,6 +57,7 @@ export default function ReaderScreen() {
     chapter?: string;
   }>();
   const router = useRouter();
+  const { user } = useAuth();
 
   const [bookTitle, setBookTitle] = useState("");
   const [totalChapters, setTotalChapters] = useState(1);
@@ -75,21 +81,18 @@ export default function ReaderScreen() {
     });
   }, []);
 
-  // Load book info + chapter
+  // Load book info
   useEffect(() => {
     loadBook();
   }, [id]);
 
+  // Load chapter
   useEffect(() => {
     loadChapter(currentChapter);
   }, [currentChapter]);
 
   async function loadBook() {
-    const { data } = await supabase
-      .from("books")
-      .select("title, total_chapters")
-      .eq("id", id)
-      .single();
+    const { data } = await booksApi.get(id);
     if (data) {
       setBookTitle(data.title);
       setTotalChapters(data.total_chapters ?? 1);
@@ -100,17 +103,12 @@ export default function ReaderScreen() {
     setLoading(true);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
 
-    const { data } = await supabase
-      .from("chapters")
-      .select("*")
-      .eq("book_id", id)
-      .eq("chapter_number", num)
-      .single();
+    const { data } = await chaptersApi.get(id, num);
 
     if (data) {
       setChapterData(data);
     } else {
-      // Fake content for testing
+      // Fallback content khi chưa có data
       setChapterData({
         id: `fake-${num}`,
         chapter_number: num,
@@ -129,7 +127,13 @@ export default function ReaderScreen() {
     scrollHeight.current = layoutMeasurement.height;
     const progress =
       contentOffset.y / (contentSize.height - layoutMeasurement.height);
-    setScrollProgress(Math.min(1, Math.max(0, progress)));
+    const clamped = Math.min(1, Math.max(0, progress));
+    setScrollProgress(clamped);
+
+    // Tự động lưu progress (debounce đơn giản bằng cách chỉ lưu mỗi 5%)
+    if (user && Math.round(clamped * 100) % 5 === 0) {
+      progressApi.save(user.id, id, currentChapter, clamped * 100);
+    }
   }
 
   const toggleControls = useCallback(() => {

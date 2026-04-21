@@ -1,21 +1,20 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-	FlatList,
-	SafeAreaView,
-	StyleSheet,
-	Text,
-	TouchableOpacity,
-	View,
+  FlatList,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
+import { books as booksApi, chapters as chaptersApi } from "../lib/api";
 
 const PINK = "#e91e8c";
 const CHAPTERS_PER_PAGE = 14;
 
 type Chapter = {
   id: string;
-  book_id: string;
   chapter_number: number;
   title: string;
   created_at?: string;
@@ -48,30 +47,21 @@ export default function TocScreen() {
     setLoading(true);
 
     // Lấy tên sách
-    const { data: book } = await supabase
-      .from("books")
-      .select("title")
-      .eq("id", id)
-      .single();
+    const { data: book } = await booksApi.get(id);
     if (book) setBookTitle(book.title);
 
     // Lấy danh sách chương
-    const { data } = await supabase
-      .from("chapters")
-      .select("*")
-      .eq("book_id", id)
-      .order("chapter_number", { ascending: true });
+    const { data } = await chaptersApi.list(id);
 
     if (data && data.length > 0) {
-      setChapters(data);
+      setChapters(data as Chapter[]);
       // Nhảy tới page chứa chương hiện tại
       const idx = data.findIndex((c) => c.chapter_number === currentChapter);
       if (idx >= 0) setPage(Math.ceil((idx + 1) / CHAPTERS_PER_PAGE));
     } else {
-      // Fake data nếu chưa có bảng chapters
+      // Fake data nếu chưa có chapters
       const fake: Chapter[] = Array.from({ length: 33 }, (_, i) => ({
         id: `fake-${i}`,
-        book_id: id,
         chapter_number: i + 1,
         title: `Chương ${i + 1}`,
         created_at: new Date(Date.now() - i * 86400000 * 2).toISOString(),

@@ -1,3 +1,5 @@
+import { books as booksApi } from "@/app/lib/api";
+import type { Book } from "@/app/lib/types";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
@@ -9,7 +11,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
 
 const PINK = "#e91e8c";
 
@@ -44,18 +45,6 @@ const TAGS = [
   "Linh Dị",
 ];
 
-type Book = {
-  id: string;
-  title: string;
-  author: string;
-  tag: string;
-  cover_url?: string;
-  total_chapters?: number;
-  genres?: string;
-  created_at?: string;
-  is_full?: boolean;
-};
-
 type Tab = "tag" | "search";
 
 function formatDate(dateStr?: string) {
@@ -81,12 +70,7 @@ export default function SearchScreen() {
     }
     setLoading(true);
     setSearched(true);
-    const clean = text.trim().replace(/^"|"$/g, "");
-    const { data } = await supabase
-      .from("books")
-      .select("*")
-      .or(`title.ilike.%${clean}%,author.ilike.%${clean}%`)
-      .limit(30);
+    const { data } = await booksApi.search(text.trim());
     setResults(data || []);
     setLoading(false);
   }

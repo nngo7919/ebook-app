@@ -1,3 +1,5 @@
+import { books as booksApi } from "@/app/lib/api";
+import type { Book } from "@/app/lib/types";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -9,17 +11,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { supabase } from "../lib/supabase";
 
 const COVER_SIZE = 90;
-
-type Book = {
-  id: string;
-  title: string;
-  author: string;
-  tag: "novel" | "book";
-  cover_url?: string;
-};
 
 const TIME_TABS = ["Ngày", "Tuần", "Tháng"];
 
@@ -40,10 +33,7 @@ export default function TrendingScreen() {
 
   async function fetchBooks() {
     setLoading(true);
-    const { data } = await supabase
-      .from("books")
-      .select("*")
-      .order("created_at", { ascending: false });
+    const { data } = await booksApi.list({ orderBy: "views" });
     setBooks(data || []);
     setLoading(false);
   }

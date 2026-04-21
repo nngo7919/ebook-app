@@ -162,11 +162,11 @@ create index collections_user_idx on public.collections(user_id);
 
 
 -- ============================================================
--- TRIGGERS
+-- TRIGGERS (SAFE VERSION)
 -- ============================================================
 
 -- auto update updated_at
-create or replace function update_updated_at()
+create or replace function public.update_updated_at()
 returns trigger as $$
 begin
   new.updated_at = now();
@@ -174,26 +174,47 @@ begin
 end;
 $$ language plpgsql;
 
-create trigger books_updated_at    before update on public.books    for each row execute function update_updated_at();
-create trigger chapters_updated_at before update on public.chapters for each row execute function update_updated_at();
-create trigger profiles_updated_at before update on public.profiles for each row execute function update_updated_at();
+drop trigger if exists books_updated_at on public.books;
+create trigger books_updated_at
+before update on public.books
+for each row execute function public.update_updated_at();
 
--- tự tạo profile khi user đăng ký
-create or replace function handle_new_user()
+drop trigger if exists chapters_updated_at on public.chapters;
+create trigger chapters_updated_at
+before update on public.chapters
+for each row execute function public.update_updated_at();
+
+drop trigger if exists profiles_updated_at on public.profiles;
+create trigger profiles_updated_at
+before update on public.profiles
+for each row execute function public.update_updated_at();
+
+
+-- auto create profile khi user signup
+create or replace function public.handle_new_user()
 returns trigger as $$
 begin
-  insert into public.profiles(id, username)
-  values (new.id, new.raw_user_meta_data->>'username');
+  insert into public.profiles (id, username, created_at, updated_at)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'username', split_part(new.email, '@', 1)),
+    now(),
+    now()
+  )
+  on conflict (id) do nothing;
+
   return new;
 end;
 $$ language plpgsql security definer;
 
+drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function handle_new_user();
+after insert on auth.users
+for each row execute function public.handle_new_user();
 
--- sync total_chapters khi thêm/xóa chapter
-create or replace function sync_total_chapters()
+
+-- sync total chapters
+create or replace function public.sync_total_chapters()
 returns trigger as $$
 begin
   update public.books
@@ -202,56 +223,130 @@ begin
     where book_id = coalesce(new.book_id, old.book_id)
   )
   where id = coalesce(new.book_id, old.book_id);
+
   return coalesce(new, old);
 end;
 $$ language plpgsql;
 
+drop trigger if exists chapters_sync_total on public.chapters;
 create trigger chapters_sync_total
-  after insert or delete on public.chapters
-  for each row execute function sync_total_chapters();
-
+after insert or delete on public.chapters
+for each row execute function public.sync_total_chapters();
 
 -- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
-alter table public.profiles           enable row level security;
-alter table public.books              enable row level security;
-alter table public.chapters           enable row level security;
-alter table public.favorites          enable row level security;
-alter table public.reading_progress   enable row level security;
-alter table public.user_library       enable row level security;
-alter table public.follows            enable row level security;
-alter table public.collections        enable row level security;
-alter table public.collection_books   enable row level security;
 
--- profiles
-create policy "profiles: read own"   on public.profiles for select using (auth.uid() = id);
-create policy "profiles: update own" on public.profiles for update using (auth.uid() = id);
+alter table public.profiles enable row level security;
+alter table public.books enable row level security;
+alter table public.chapters enable row level security;
+alter table public.favorites enable row level security;
+alter table public.reading_progress enable row level security;
+alter table public.user_library enable row level security;
+alter table public.follows enable row level security;
+alter table public.collections enable row level security;
+alter table public.collection_books enable row level security;
 
--- books & chapters — public read
-create policy "books: public read"    on public.books    for select using (true);
-create policy "chapters: public read" on public.chapters for select using (true);
+-- ── PROFILES ─────────────────────────
+create policy "profiles_read"
+on public.profiles
+for select using (true);
 
--- favorites / progress / library / follows — chỉ owner
-create policy "favorites: own"          on public.favorites         for all using (auth.uid() = user_id);
-create policy "reading_progress: own"   on public.reading_progress  for all using (auth.uid() = user_id);
-create policy "user_library: own"       on public.user_library      for all using (auth.uid() = user_id);
-create policy "follows: own"            on public.follows           for all using (auth.uid() = user_id);
+create policy "profiles_update_own"
+on public.profiles
+for update
+using (auth.uid() = id)
+with check (auth.uid() = id);
 
--- collections
-create policy "collections: read" on public.collections
-  for select using (is_public = true or auth.uid() = user_id);
-create policy "collections: write own" on public.collections
-  for all using (auth.uid() = user_id);
+-- ── BOOKS ───────────────────────────
+create policy "books_read"
+on public.books
+for select using (true);
 
-create policy "collection_books: read" on public.collection_books
-  for select using (
-    exists (select 1 from public.collections c
-            where c.id = collection_id
-              and (c.is_public = true or c.user_id = auth.uid()))
-  );
-create policy "collection_books: write own" on public.collection_books
-  for all using (
-    exists (select 1 from public.collections c
-            where c.id = collection_id and c.user_id = auth.uid())
-  );
+-- ⚠️ TẠM cho phép user login là ghi được (để bạn test)
+create policy "books_write"
+on public.books
+for all
+using (auth.uid() is not null)
+with check (auth.uid() is not null);
+
+-- ── CHAPTERS ────────────────────────
+create policy "chapters_read"
+on public.chapters
+for select using (true);
+
+create policy "chapters_write"
+on public.chapters
+for all
+using (auth.uid() is not null)
+with check (auth.uid() is not null);
+
+-- ── FAVORITES ───────────────────────
+create policy "favorites_all"
+on public.favorites
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+-- ── READING PROGRESS ────────────────
+create policy "reading_progress_all"
+on public.reading_progress
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+-- ── USER LIBRARY ────────────────────
+create policy "user_library_all"
+on public.user_library
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+-- ── FOLLOWS ─────────────────────────
+create policy "follows_all"
+on public.follows
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+-- ── COLLECTIONS ─────────────────────
+create policy "collections_read"
+on public.collections
+for select
+using (is_public = true or auth.uid() = user_id);
+
+create policy "collections_write"
+on public.collections
+for all
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+
+-- ── COLLECTION_BOOKS ────────────────
+create policy "collection_books_read"
+on public.collection_books
+for select
+using (
+  exists (
+    select 1 from public.collections c
+    where c.id = collection_id
+      and (c.is_public = true or c.user_id = auth.uid())
+  )
+);
+
+create policy "collection_books_write"
+on public.collection_books
+for all
+using (
+  exists (
+    select 1 from public.collections c
+    where c.id = collection_id
+      and c.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.collections c
+    where c.id = collection_id
+      and c.user_id = auth.uid()
+  )
+);
