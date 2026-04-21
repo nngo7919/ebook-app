@@ -37,6 +37,18 @@ export default function LibraryScreen() {
   const [updatedBooks, setUpdatedBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Derived fake lists — computed một lần từ FAKE_BOOKS
+  const ratedBooks = [...FAKE_BOOKS]
+    .sort((a, b) => b.likes / (b.views || 1) - a.likes / (a.views || 1))
+    .slice(0, 6);
+  const likedBooks = [...FAKE_BOOKS]
+    .sort((a, b) => b.likes - a.likes)
+    .slice(0, 6);
+  const viewedBooks = [...FAKE_BOOKS]
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 6);
+  const fullBooks = FAKE_BOOKS.filter((b) => b.is_full);
+
   useEffect(() => {
     fetchBooks();
   }, []);
@@ -167,6 +179,63 @@ export default function LibraryScreen() {
           renderItem={({ item }) => <BookCard item={item} />}
         />
 
+        {/* Đánh Giá Cao */}
+        <SectionHeader
+          title="⭐ Đánh giá cao"
+          onMore={() =>
+            router.push({
+              pathname: "/category",
+              params: { title: "Đánh Giá" },
+            })
+          }
+        />
+        <FlatList
+          data={ratedBooks}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id + "rated"}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => <BookCard item={item} />}
+        />
+
+        {/* Yêu Thích */}
+        <SectionHeader
+          title="❤️ Yêu thích nhiều"
+          onMore={() =>
+            router.push({
+              pathname: "/category",
+              params: { title: "Yêu Thích" },
+            })
+          }
+        />
+        <FlatList
+          data={likedBooks}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id + "liked"}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => <BookCard item={item} />}
+        />
+
+        {/* Xem Nhiều */}
+        <SectionHeader
+          title="📊 Xem nhiều"
+          onMore={() =>
+            router.push({
+              pathname: "/category",
+              params: { title: "Xem Nhiều" },
+            })
+          }
+        />
+        <FlatList
+          data={viewedBooks}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id + "viewed"}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => <BookCard item={item} />}
+        />
+
         {/* Truyện Full - Hoàn */}
         <View style={styles.fullSection}>
           <Text style={styles.sectionTitle}>Truyện Full – Hoàn</Text>
@@ -186,6 +255,18 @@ export default function LibraryScreen() {
               </TouchableOpacity>
             ))}
           </View>
+          {/* Preview full books */}
+          <FlatList
+            data={fullBooks.slice(0, 6)}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id + "full"}
+            contentContainerStyle={[
+              styles.horizontalList,
+              { paddingHorizontal: 0, marginTop: 12 },
+            ]}
+            renderItem={({ item }) => <BookCard item={item} />}
+          />
         </View>
 
         <View style={{ height: 32 }} />

@@ -235,3 +235,58 @@ export const FAKE_LIBRARY_ITEMS: UserLibraryItem[] = FAKE_BOOKS.slice(0, 3).map(
 	created_at: new Date().toISOString(),
 	current_chapter: 1,
 }));
+
+
+// ── SORTED LISTS (dùng cho category screen) ──────────────────
+
+/** Sort theo rating (giả lập = likes / views * 5) */
+export const FAKE_BOOKS_BY_RATING = [...FAKE_BOOKS]
+	.map((b) => ({ ...b, _rating: parseFloat(((b.likes / (b.views || 1)) * 5 * 10).toFixed(1)) }))
+	.sort((a, b) => b._rating - a._rating);
+
+/** Sort theo lượt thích */
+export const FAKE_BOOKS_BY_LIKES = [...FAKE_BOOKS]
+	.sort((a, b) => b.likes - a.likes);
+
+/** Sort theo lượt xem */
+export const FAKE_BOOKS_BY_VIEWS = [...FAKE_BOOKS]
+	.sort((a, b) => b.views - a.views);
+
+/** Thịnh hành = xem nhiều nhất (trending) */
+export const FAKE_BOOKS_TRENDING = [...FAKE_BOOKS]
+	.sort((a, b) => b.views - a.views);
+
+/** Truyện full */
+export const FAKE_BOOKS_FULL = FAKE_BOOKS.filter((b) => b.is_full);
+
+/** Full + sort theo ngày cập nhật */
+export const FAKE_BOOKS_FULL_UPDATED = [...FAKE_BOOKS_FULL]
+	.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+/** Full + đánh giá cao */
+export const FAKE_BOOKS_FULL_RATING = [...FAKE_BOOKS_FULL]
+	.sort((a, b) => (b.likes / (b.views || 1)) - (a.likes / (a.views || 1)));
+
+/** Full + yêu thích nhiều */
+export const FAKE_BOOKS_FULL_LIKED = [...FAKE_BOOKS_FULL]
+	.sort((a, b) => b.likes - a.likes);
+
+/** Full + xem nhiều */
+export const FAKE_BOOKS_FULL_VIEWS = [...FAKE_BOOKS_FULL]
+	.sort((a, b) => b.views - a.views);
+
+/** Map title → fake list — dùng trong category.tsx */
+export const FAKE_CATEGORY_MAP: Record<string, typeof FAKE_BOOKS> = {
+	// Quick filters
+	"Đánh Giá": FAKE_BOOKS_BY_RATING,
+	"Yêu Thích": FAKE_BOOKS_BY_LIKES,
+	"Xem Nhiều": FAKE_BOOKS_BY_VIEWS,
+	// Xem thêm từ library
+	"Mới Đăng": FAKE_BOOKS,
+	"Mới Cập Nhật": FAKE_BOOKS,
+	// Full categories
+	"Full – Mới Cập Nhật": FAKE_BOOKS_FULL_UPDATED,
+	"Full – Đánh Giá Cao": FAKE_BOOKS_FULL_RATING,
+	"Full – Yêu Thích": FAKE_BOOKS_FULL_LIKED,
+	"Full – Xem Nhiều": FAKE_BOOKS_FULL_VIEWS,
+};

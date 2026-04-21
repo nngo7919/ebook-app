@@ -1,4 +1,5 @@
 import { books as booksApi } from "@/app/lib/api";
+import { FAKE_BOOKS, FAKE_CATEGORY_MAP } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -29,11 +30,26 @@ export default function CategoryScreen() {
 
   async function fetchBooks() {
     setLoading(true);
-    // Nếu có title (genre), tìm theo genre; nếu không lấy tất cả
     const { data } = title
       ? await booksApi.byGenre(title)
       : await booksApi.list();
-    setBooks(data || []);
+    if (data && data.length > 0) {
+      setBooks(data);
+    } else {
+      // Ưu tiên map cố định (Đánh Giá, Yêu Thích, Full...) → fallback lọc genre → fallback toàn bộ
+      const titleStr = (title as string) ?? "";
+      const mapped = FAKE_CATEGORY_MAP[titleStr];
+      if (mapped) {
+        setBooks(mapped);
+      } else {
+        const filtered = FAKE_BOOKS.filter((b) =>
+          b.genres_list?.some((g) =>
+            g.toLowerCase().includes(titleStr.toLowerCase()),
+          ),
+        );
+        setBooks(filtered.length > 0 ? filtered : FAKE_BOOKS);
+      }
+    }
     setLoading(false);
   }
 
