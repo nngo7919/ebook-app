@@ -1,4 +1,5 @@
 import { books as booksApi } from "@/app/lib/api";
+import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useRouter } from "expo-router";
 import { useState } from "react";
@@ -71,7 +72,19 @@ export default function SearchScreen() {
     setLoading(true);
     setSearched(true);
     const { data } = await booksApi.search(text.trim());
-    setResults(data || []);
+    if (data && data.length > 0) {
+      setResults(data);
+    } else {
+      // Fake: lọc trong FAKE_BOOKS theo tên/tác giả
+      const q = text.trim().toLowerCase();
+      const fakeResults = FAKE_BOOKS.filter(
+        (b) =>
+          b.title.toLowerCase().includes(q) ||
+          b.author.toLowerCase().includes(q) ||
+          (b.genres ?? "").toLowerCase().includes(q),
+      );
+      setResults(fakeResults.length > 0 ? fakeResults : FAKE_BOOKS);
+    }
     setLoading(false);
   }
 
@@ -160,7 +173,7 @@ export default function SearchScreen() {
           </Text>
           <Text style={styles.hintText2}>
             Để tìm chính xác kết quả, bạn cần thêm dấu nháy {'" "'}
-            {"\n"}vào cụm từ như:{"\n"} "me chong nha nong"
+            {"\n"}vào cụm từ như:{"\n"} {"me chong nha nong"}
           </Text>
           <TouchableOpacity>
             <Text style={styles.filterLink}>Tìm Với Bộ Lọc Truyện</Text>

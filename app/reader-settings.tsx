@@ -1,39 +1,18 @@
+import { DEFAULT_READER_SETTINGS, type ReaderSettings } from "@/app/lib/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-	SafeAreaView,
-	ScrollView,
-	StyleSheet,
-	Switch,
-	Text,
-	TouchableOpacity,
-	View,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const PINK = "#e91e8c";
-
-type Settings = {
-  bgColor: string;
-  textColor: string;
-  fontSize: number;
-  lineHeight: number;
-  readMode: "scroll" | "page" | "combined";
-  autoScroll: boolean;
-  scrollSpeed: number;
-  pageFlipTime: number;
-};
-
-const DEFAULT_SETTINGS: Settings = {
-  bgColor: "#0d0d0d",
-  textColor: "#e0e0e0",
-  fontSize: 19,
-  lineHeight: 1.6,
-  readMode: "combined",
-  autoScroll: false,
-  scrollSpeed: 20,
-  pageFlipTime: 25,
-};
 
 const BG_OPTIONS = [
   { label: "Auto", bg: "#0d0d0d", text: "#e0e0e0", isAuto: true },
@@ -79,15 +58,17 @@ function Stepper({
 
 export default function ReaderSettingsScreen() {
   const router = useRouter();
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<ReaderSettings>(
+    DEFAULT_READER_SETTINGS,
+  );
 
   useEffect(() => {
     AsyncStorage.getItem("reader_settings").then((val) => {
-      if (val) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(val) });
+      if (val) setSettings({ ...DEFAULT_READER_SETTINGS, ...JSON.parse(val) });
     });
   }, []);
 
-  function update(patch: Partial<Settings>) {
+  function update(patch: Partial<ReaderSettings>) {
     const next = { ...settings, ...patch };
     setSettings(next);
     AsyncStorage.setItem("reader_settings", JSON.stringify(next));
