@@ -2,7 +2,7 @@ import { books as booksApi } from "@/app/lib/api";
 import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -35,7 +35,6 @@ export default function LibraryScreen() {
   const router = useRouter();
   const [newBooks, setNewBooks] = useState<Book[]>([]);
   const [updatedBooks, setUpdatedBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState(true);
 
   // Derived fake lists — computed một lần từ FAKE_BOOKS
   const ratedBooks = [...FAKE_BOOKS]
@@ -54,12 +53,19 @@ export default function LibraryScreen() {
   }, []);
 
   async function fetchBooks() {
+<<<<<<< Updated upstream
     setLoading(true);
     const { data } = await booksApi.list({ orderBy: "created_at", limit: 12 });
     const all = data && data.length > 0 ? data : FAKE_BOOKS;
+=======
+    const { data } = await supabase
+      .from("books")
+      .select("*")
+      .order("created_at", { ascending: false });
+    const all = data || [];
+>>>>>>> Stashed changes
     setNewBooks(all.slice(0, 6));
     setUpdatedBooks(all.slice(0, 6));
-    setLoading(false);
   }
 
   function BookCard({ item }: { item: Book }) {
@@ -155,9 +161,9 @@ export default function LibraryScreen() {
           data={newBooks}
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id + "new"}
+          keyExtractor={(item: Book) => item.id + "new"}
           contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => <BookCard item={item} />}
+          renderItem={({ item }: { item: Book }) => <BookCard item={item} />}
         />
 
         {/* Mới Cập Nhật */}
@@ -174,9 +180,9 @@ export default function LibraryScreen() {
           data={updatedBooks}
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id + "updated"}
+          keyExtractor={(item: Book) => item.id + "updated"}
           contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => <BookCard item={item} />}
+          renderItem={({ item }: { item: Book }) => <BookCard item={item} />}
         />
 
         {/* Đánh Giá Cao */}
