@@ -99,6 +99,8 @@ export default function ReaderScreen() {
         title: `Chương ${num}`,
         content: `Lão phu bấm ngón tay tính toán, hiện giờ người đang nằm trên giường xem tiểu thuyết, lại còn nằm nghiêng, có khi điện thoại còn đang sạc pin.\n\nDương Gian, cậu học sinh lớp 12, lúc này đang nằm trong chăn, buồn chán lướt điện thoại. Hắn tiện tay mở một bài viết, bên dưới có rất nhiều bình luận của cư dân mạng.\n\n"Thánh thật sự, chủ thớt đoán trúng phóc luôn."\n\n"Mọi người biết tôi đang đi vệ sinh không?"\n\nDương Gian lắc đầu cười, tiếp tục cuộn xuống đọc thêm. Bên ngoài cửa sổ, tiếng gió thổi xào xạc qua những tán lá xanh.`,
         word_count: 0,
+        is_deleted: false,
+        deleted_at: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       });

@@ -173,7 +173,7 @@ export default function SearchScreen() {
           </Text>
           <Text style={styles.hintText2}>
             Để tìm chính xác kết quả, bạn cần thêm dấu nháy {'" "'}
-            {"\n"}vào cụm từ như:{"\n"} "me chong nha nong"
+            {"\n"}vào cụm từ như:{"\n"} {"me chong nha nong"}
           </Text>
           <TouchableOpacity>
             <Text style={styles.filterLink}>Tìm Với Bộ Lọc Truyện</Text>

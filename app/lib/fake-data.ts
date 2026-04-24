@@ -5,10 +5,20 @@
 
 import type { Book, Chapter, UserLibraryItem } from "./types";
 
+const BOOK_DEFAULTS = {
+	author_id: null,
+	rating_avg: 0,
+	rating_count: 0,
+	comment_count: 0,
+	is_deleted: false,
+	deleted_at: null,
+} as const;
+
 // ── BOOKS ────────────────────────────────────────────────────
 
 export const FAKE_BOOKS: Book[] = [
 	{
+		...BOOK_DEFAULTS,
 		id: "1",
 		title: "Khủng Bố Sống Lại",
 		author: "Phát Tiểu Tiểu Tiêu",
@@ -26,6 +36,7 @@ export const FAKE_BOOKS: Book[] = [
 		updated_at: new Date().toISOString(),
 	},
 	{
+		...BOOK_DEFAULTS,
 		id: "2",
 		title: "Trọng Sinh Trong Sách Pháo Hôi Học Tra Người Qua Đường Giáp",
 		author: "tntytn",
@@ -43,6 +54,7 @@ export const FAKE_BOOKS: Book[] = [
 		updated_at: new Date().toISOString(),
 	},
 	{
+		...BOOK_DEFAULTS,
 		id: "3",
 		title: "Xuyên Thành Nông Nữ, Được Cả Nhà Cưng",
 		author: "Viện Kinh Phong",
@@ -60,6 +72,7 @@ export const FAKE_BOOKS: Book[] = [
 		updated_at: new Date().toISOString(),
 	},
 	{
+		...BOOK_DEFAULTS,
 		id: "4",
 		title: "Dọn Sạch Cả Nhà, Ta Xuống Nông Thôn",
 		author: "Nguyệt Dạ Hồng Liên",
@@ -77,6 +90,7 @@ export const FAKE_BOOKS: Book[] = [
 		updated_at: new Date().toISOString(),
 	},
 	{
+		...BOOK_DEFAULTS,
 		id: "5",
 		title: "Sau Khi Bắt Được Chồng Quân Nhân",
 		author: "Đại Nguyên Từ Nha",
@@ -94,6 +108,7 @@ export const FAKE_BOOKS: Book[] = [
 		updated_at: new Date().toISOString(),
 	},
 	{
+		...BOOK_DEFAULTS,
 		id: "6",
 		title: "Nhung Đen - Nha Nha Cật Tố Dã Cật N...",
 		author: "Nha Nha Cật Tố",
@@ -111,6 +126,7 @@ export const FAKE_BOOKS: Book[] = [
 		updated_at: new Date().toISOString(),
 	},
 	{
+		...BOOK_DEFAULTS,
 		id: "7",
 		title: "Đóa Hoa Lạnh Lùng Nhà Bên Yêu Tôi",
 		author: "Hằng Nha Nha",
@@ -128,6 +144,7 @@ export const FAKE_BOOKS: Book[] = [
 		updated_at: new Date().toISOString(),
 	},
 	{
+		...BOOK_DEFAULTS,
 		id: "8",
 		title: "Tiên Nghịch",
 		author: "Nhĩ Căn",
@@ -203,6 +220,8 @@ export function makeFakeChapters(bookId: string, count = 33): Chapter[] {
 				: `Chương ${i + 1}`,
 		content: FAKE_CONTENT,
 		word_count: 1200,
+		is_deleted: false,
+		deleted_at: null,
 		created_at: new Date(Date.now() - i * 2 * 86400000).toISOString(),
 		updated_at: new Date().toISOString(),
 	}));
@@ -227,6 +246,7 @@ export const FAKE_LIBRARY_ITEMS: UserLibraryItem[] = FAKE_BOOKS.slice(0, 3).map(
 	user_id: "fake-user",
 	book_id: b.id,
 	title: b.title,
+	author_id: null,
 	author: b.author,
 	tag: b.tag,
 	cover_url: b.cover_url,

@@ -1,4 +1,5 @@
 import { books as booksApi } from "@/app/lib/api";
+import { FAKE_BOOKS_TRENDING } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -15,11 +16,11 @@ import {
 const COVER_SIZE = 90;
 
 const TIME_TABS = ["Ngày", "Tuần", "Tháng"];
+const TIME_PERIODS = ["day", "week", "month"] as const;
 
-const FAKE_GENRES: Record<string, string> = {
-  novel: "Ngôn Tình · Hiện Đại · HE · Đô Thị...",
-  book: "Kỹ Năng · Tâm Lý · Phát Triển Bản Thân...",
-};
+function formatViews(views?: number) {
+  return new Intl.NumberFormat("vi-VN").format(views ?? 0);
+}
 
 export default function TrendingScreen() {
   const router = useRouter();
@@ -33,14 +34,18 @@ export default function TrendingScreen() {
 
   async function fetchBooks() {
     setLoading(true);
-    const { data } = await booksApi.list({ orderBy: "views" });
-    setBooks(data || []);
+    const period = TIME_PERIODS[activeTab] ?? "day";
+    const { data } = await booksApi.trending({ period, limit: 50 });
+    setBooks((data && data.length > 0 ? data : FAKE_BOOKS_TRENDING) || []);
     setLoading(false);
   }
 
   function RankItem({ item, index }: { item: Book; index: number }) {
-    const fakeChapters = Math.floor(Math.random() * 900) + 50;
-    const genres = FAKE_GENRES[item.tag] ?? "Ngôn Tình · Hiện Đại · HE...";
+    const chapters = item.total_chapters ?? 0;
+    const status = item.is_full ? "FULL" : "Đang ra";
+    const genres = item.genres_list?.length
+      ? item.genres_list.join(" · ")
+      : (item.genres ?? "Chưa có thể loại");
 
     return (
       <TouchableOpacity
@@ -55,7 +60,9 @@ export default function TrendingScreen() {
             {item.title}
           </Text>
           <View style={{ height: 8 }} />
-          <Text style={styles.rankMeta}>{fakeChapters} chương　【FULL】</Text>
+          <Text style={styles.rankMeta}>
+            {chapters} chương  【{status}】  {formatViews(item.views)} lượt xem
+          </Text>
           <Text style={styles.rankGenres} numberOfLines={1}>
             {genres}
           </Text>

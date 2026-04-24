@@ -48,7 +48,8 @@ export default function BookDetailScreen() {
     setLoading(true);
     const { data } = await booksApi.get(id);
     if (data) {
-      setBook(data);
+      setBook({ ...data, views: (data.views ?? 0) + 1 });
+      void booksApi.incrementViews(id, { userId: user?.id });
     } else {
       // Fake data — tìm trong FAKE_BOOKS theo id, nếu không có dùng phần tử đầu
       const fake = FAKE_BOOKS.find((b) => b.id === id) ?? FAKE_BOOKS[0];
@@ -89,6 +90,7 @@ export default function BookDetailScreen() {
   const chapters = book.total_chapters ?? 17;
   const likes = book.likes ?? 57;
   const views = book.views ?? 101;
+  const authorName = book.author ?? "Äang cáº­p nháº­t";
   const ago = formatMinutes(book.created_at);
   const tags = book.genres
     ? book.genres.split(",").map((g) => g.trim())
@@ -198,9 +200,11 @@ export default function BookDetailScreen() {
         <View style={styles.actionRow}>
           <TouchableOpacity
             style={[styles.actionBtn, liked && styles.actionBtnActive]}
-            onPress={() => setLiked(!liked)}
+            onPress={handleToggleLike}
           >
-            <Text style={styles.actionIcon}>{liked ? "♥" : "♡"}</Text>
+            <Text style={[styles.actionIcon, liked && styles.actionIconActive]}>
+              {liked ? "♥" : "♡"}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn}>
             <Text style={styles.actionIcon}>⊞</Text>
@@ -224,7 +228,7 @@ export default function BookDetailScreen() {
             <Text style={{ fontSize: 22 }}>👤</Text>
           </View>
           <View>
-            <Text style={styles.authorName}>{book.author}</Text>
+            <Text style={styles.authorName}>{authorName}</Text>
             <Text style={styles.authorTime}>{ago}</Text>
           </View>
         </View>
@@ -408,6 +412,7 @@ const styles = StyleSheet.create({
   },
   actionBtnActive: { backgroundColor: PINK },
   actionIcon: { color: PINK, fontSize: 20 },
+  actionIconActive: { color: "#fff" },
 
   // Author
   authorRow: {
