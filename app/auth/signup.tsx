@@ -2,27 +2,28 @@
 // app/auth/signup.tsx — Màn hình đăng ký
 // ============================================================
 
-import { auth } from "@/app/lib/api";
+import { useAuth } from "@/app/lib/auth";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-	ActivityIndicator,
-	Alert,
-	KeyboardAvoidingView,
-	Platform,
-	SafeAreaView,
-	ScrollView,
-	StyleSheet,
-	Text,
-	TextInput,
-	TouchableOpacity,
-	View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const PINK = "#e91e8c";
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { signUp, signOut } = useAuth();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,7 +48,7 @@ export default function SignupScreen() {
     }
 
     setLoading(true);
-    const { error } = await auth.signUp({
+    const { error, requiresConfirmation } = await signUp({
       email: email.trim(),
       password,
       username: username.trim(),
@@ -59,11 +60,23 @@ export default function SignupScreen() {
       return;
     }
 
-    Alert.alert(
-      "Đăng ký thành công! 🎉",
-      "Vui lòng kiểm tra email để xác nhận tài khoản, sau đó đăng nhập.",
-      [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login") }],
-    );
+    if (requiresConfirmation) {
+      // Confirm email = ON → session chưa tạo, chỉ cần báo user kiểm tra email
+      Alert.alert(
+        "Kiểm tra email của bạn 📬",
+        `Chúng tôi đã gửi link xác nhận đến ${email.trim()}. Sau khi xác nhận hãy đăng nhập.`,
+        [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login") }],
+      );
+    } else {
+      // Confirm email = OFF → Supabase tạo session luôn, cần sign out
+      // trước khi alert để tránh AuthProvider tự redirect sang tabs
+      await signOut();
+      Alert.alert(
+        "Đăng ký thành công! 🎉",
+        "Tài khoản đã được tạo. Bạn có thể đăng nhập ngay bây giờ.",
+        [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login") }],
+      );
+    }
   }
 
   return (

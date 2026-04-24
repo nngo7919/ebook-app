@@ -165,19 +165,37 @@ export const auth = {
   },
 
   /** Đăng ký tài khoản mới */
-  async signUp(creds: SignUpCredentials): Promise<ApiResult<true>> {
-    const { error } = await supabase.auth.signUp({
+  async signUp(creds: SignUpCredentials): Promise<ApiResult<{ requiresConfirmation: boolean }>> {
+    const { data, error } = await supabase.auth.signUp({
       email: creds.email,
       password: creds.password,
       options: { data: { username: creds.username } },
     })
     if (error) return err(supaErr(error))
-    return ok(true as const)
+    // session = null → Supabase yêu cầu xác nhận email
+    // session có giá trị → Confirm email đang tắt, đăng nhập luôn
+    return ok({ requiresConfirmation: !data.session })
   },
 
   /** Đăng xuất */
   async signOut(): Promise<ApiResult<true>> {
     const { error } = await supabase.auth.signOut()
+    if (error) return err(supaErr(error))
+    return ok(true as const)
+  },
+
+  /** Đăng nhập ẩn danh (guest mode) */
+  async signInAnonymously(): Promise<ApiResult<true>> {
+    const { error } = await supabase.auth.signInAnonymously()
+    if (error) return err(supaErr(error))
+    return ok(true as const)
+  },
+
+  /** Gửi email đặt lại mật khẩu */
+  async resetPassword(email: string): Promise<ApiResult<true>> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: 'tytebook://reset-password',
+    })
     if (error) return err(supaErr(error))
     return ok(true as const)
   },

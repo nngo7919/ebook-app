@@ -63,36 +63,18 @@ const SECTIONS = [
       },
     ],
   },
-  {
-    key: "logout",
-    items: [{ icon: "logout", label: "Đăng xuất", onPress: "logout" }],
-  },
 ];
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, user, signOut } = useAuth();
+  const { profile, user } = useAuth();
 
-  const displayName = profile?.display_name ?? user?.email ?? "Người dùng";
+  const displayName = profile?.display_name ?? user?.email?.split("@")[0] ?? "Người dùng";
   const avatarLetter = displayName.charAt(0).toUpperCase();
 
   function handlePress(item: any) {
     if (item.route) {
       router.push(item.route);
-      return;
-    }
-    if (item.onPress === "logout") {
-      Alert.alert("Đăng xuất", "Bạn có chắc muốn đăng xuất?", [
-        { text: "Huỷ", style: "cancel" },
-        {
-          text: "Đăng xuất",
-          style: "destructive",
-          onPress: async () => {
-            await signOut();
-            router.replace("/auth/login");
-          },
-        },
-      ]);
     }
   }
 
@@ -119,8 +101,10 @@ export default function ProfileScreen() {
 
       {/* Avatar + Name */}
       <View style={styles.avatarSection}>
-        <View style={styles.avatar} />
-        <Text style={styles.userName}>Ngô Mạnh Đức</Text>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarLetter}>{avatarLetter}</Text>
+        </View>
+        <Text style={styles.userName}>{displayName}</Text>
       </View>
 
       {/* Menu sections */}
@@ -178,7 +162,10 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     backgroundColor: "#444",
     marginBottom: 14,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  avatarLetter: { color: "#fff", fontSize: 32, fontWeight: "700" },
   userName: { color: "#ffffff", fontSize: 18, fontWeight: "bold" },
 
   // Sections

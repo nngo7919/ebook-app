@@ -23,11 +23,13 @@ type AuthState = {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  isGuest: boolean;
 };
 
 type AuthActions = {
   signIn: (creds: AuthCredentials) => Promise<{ error: string | null }>;
-  signUp: (creds: SignUpCredentials) => Promise<{ error: string | null }>;
+  signUp: (creds: SignUpCredentials) => Promise<{ error: string | null; requiresConfirmation?: boolean }>;
+  signInAnonymously: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -46,8 +48,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // isGuest = đã đăng nhập nhưng là anonymous user (không có email)
+  const isGuest = !!user && user.is_anonymous === true;
+
   // Load profile từ Supabase qua API layer
-  const loadProfile = useCallback(async (userId: string) => {
+  // Anonymous user không có profile — bỏ qua lỗi, không crash
+  const loadProfile = useCallback(async (userId: string, isAnonymous = false) => {
+    if (isAnonymous) return; // guest không có profile row
     const { data } = await profilesApi.get(userId);
     if (data) setProfile(data);
   }, []);
@@ -57,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) loadProfile(session.user.id);
+      if (session?.user) loadProfile(session.user.id, session.user.is_anonymous);
       setLoading(false);
     });
 
@@ -67,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        loadProfile(session.user.id);
+        loadProfile(session.user.id, session.user.is_anonymous);
       } else {
         setProfile(null);
       }
@@ -87,8 +94,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signUp = async (
     creds: SignUpCredentials,
-  ): Promise<{ error: string | null }> => {
-    const { error } = await authApi.signUp(creds);
+  ): Promise<{ error: string | null; requiresConfirmation?: boolean }> => {
+    const { data, error } = await authApi.signUp(creds);
+    return { error, requiresConfirmation: data?.requiresConfirmation };
+  };
+
+  const signInAnonymously = async (): Promise<{ error: string | null }> => {
+    const { error } = await authApi.signInAnonymously();
     return { error };
   };
 
@@ -107,8 +119,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         session,
         loading,
+        isGuest,
         signIn,
         signUp,
+        signInAnonymously,
         signOut,
         refreshProfile,
       }}

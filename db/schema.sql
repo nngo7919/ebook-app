@@ -342,3 +342,231 @@ with
                 and c.user_id = auth.uid ()
         )
     );
+-- ============================================================
+-- MIGRATION 001 — Thêm authors, ratings, comments, book_views
+-- ============================================================
+
+-- ============================================================
+-- 9. AUTHORS
+-- Tách author thành entity riêng để có trang tác giả, follow
+-- ============================================================
+create table public.authors (
+  id             uuid primary key default uuid_generate_v4(),
+  name           text not null,
+  bio            text,
+  avatar_url     text,
+  verified       boolean not null default false,
+  follower_count int not null default 0,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+create index authors_name_idx       on public.authors(name);
+create index authors_follower_idx   on public.authors(follower_count desc);
+
+-- Thêm author_id vào books (nullable để không vỡ data cũ)
+alter table public.books add column if not exists author_id uuid references public.authors(id) on delete set null;
+create index books_author_id_idx on public.books(author_id);
+
+-- Trigger updated_at cho authors
+drop trigger if exists authors_updated_at on public.authors;
+create trigger authors_updated_at
+  before update on public.authors
+  for each row execute function public.update_updated_at();
+
+
+-- ============================================================
+-- 10. RATINGS
+-- Mỗi user chỉ rate 1 lần / book (upsert), soft delete
+-- ============================================================
+create table public.ratings (
+  id          uuid primary key default uuid_generate_v4(),
+  book_id     uuid not null references public.books(id) on delete cascade,
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  rating      smallint not null check (rating between 1 and 5),
+  is_deleted  boolean not null default false,
+  deleted_at  timestamptz,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+
+  unique(book_id, user_id)
+);
+
+create index ratings_book_idx   on public.ratings(book_id) where is_deleted = false;
+create index ratings_user_idx   on public.ratings(user_id);
+
+-- Thêm rating_avg + rating_count vào books để tránh query nặng
+alter table public.books add column if not exists rating_avg  numeric(3,2) not null default 0;
+alter table public.books add column if not exists rating_count int         not null default 0;
+
+-- Trigger sync rating_avg khi insert/update/delete rating
+create or replace function public.sync_book_rating()
+returns trigger as $$
+declare
+  target_book_id uuid;
+begin
+  target_book_id := coalesce(new.book_id, old.book_id);
+  update public.books
+  set
+    rating_avg   = coalesce((
+      select round(avg(rating)::numeric, 2)
+      from public.ratings
+      where book_id = target_book_id and is_deleted = false
+    ), 0),
+    rating_count = (
+      select count(*)
+      from public.ratings
+      where book_id = target_book_id and is_deleted = false
+    )
+  where id = target_book_id;
+  return coalesce(new, old);
+end;
+$$ language plpgsql;
+
+drop trigger if exists ratings_sync_book on public.ratings;
+create trigger ratings_sync_book
+  after insert or update or delete on public.ratings
+  for each row execute function public.sync_book_rating();
+
+drop trigger if exists ratings_updated_at on public.ratings;
+create trigger ratings_updated_at
+  before update on public.ratings
+  for each row execute function public.update_updated_at();
+
+
+-- ============================================================
+-- 11. COMMENTS
+-- Nested replies (parent_id), soft delete, likes
+-- ============================================================
+create table public.comments (
+  id          uuid primary key default uuid_generate_v4(),
+  book_id     uuid not null references public.books(id) on delete cascade,
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  content     text not null,
+  parent_id   uuid references public.comments(id) on delete cascade,
+  likes       int not null default 0,
+  is_deleted  boolean not null default false,
+  deleted_at  timestamptz,
+  is_edited   boolean not null default false,
+  edited_at   timestamptz,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+create index comments_book_idx    on public.comments(book_id, created_at desc) where is_deleted = false;
+create index comments_user_idx    on public.comments(user_id);
+create index comments_parent_idx  on public.comments(parent_id) where parent_id is not null;
+
+drop trigger if exists comments_updated_at on public.comments;
+create trigger comments_updated_at
+  before update on public.comments
+  for each row execute function public.update_updated_at();
+
+
+-- ============================================================
+-- 12. BOOK_VIEWS
+-- Log từng lượt xem để tính trending theo thời gian
+-- user_id nullable → hỗ trợ guest mode
+-- ============================================================
+create table public.book_views (
+  id         uuid primary key default uuid_generate_v4(),
+  book_id    uuid not null references public.books(id) on delete cascade,
+  user_id    uuid references public.profiles(id) on delete set null,
+  is_guest   boolean not null default false,
+  guest_id   text,         -- device/session ID cho guest
+  viewed_at  timestamptz not null default now()
+);
+
+-- Index cho trending query theo thời gian
+create index book_views_book_idx       on public.book_views(book_id);
+create index book_views_viewed_at_idx  on public.book_views(book_id, viewed_at desc);
+create index book_views_period_idx     on public.book_views(viewed_at desc);
+
+-- Trigger: sync books.views khi có view mới
+create or replace function public.sync_book_views()
+returns trigger as $$
+begin
+  update public.books
+  set views = (select count(*) from public.book_views where book_id = new.book_id)
+  where id = new.book_id;
+  return new;
+end;
+$$ language plpgsql;
+
+drop trigger if exists book_views_sync_count on public.book_views;
+create trigger book_views_sync_count
+  after insert on public.book_views
+  for each row execute function public.sync_book_views();
+
+
+-- ============================================================
+-- FOLLOW CẬP NHẬT — thêm author_id column vào follows
+-- follows giờ dùng được cho cả book và author
+-- ============================================================
+alter table public.follows
+  add column if not exists author_id uuid references public.authors(id) on delete cascade;
+
+-- Đảm bảo chỉ follow 1 trong 2 (book hoặc author), không phải cả hai
+alter table public.follows
+  drop constraint if exists follows_target_check;
+alter table public.follows
+  add constraint follows_target_check
+  check (
+    (book_id is not null and author_id is null) or
+    (book_id is null and author_id is not null)
+  );
+
+-- Index follow author
+create index if not exists follows_author_idx on public.follows(author_id) where author_id is not null;
+
+-- Trigger sync follower_count trên authors
+create or replace function public.sync_author_follower_count()
+returns trigger as $$
+declare
+  target_author_id uuid;
+begin
+  target_author_id := coalesce(new.author_id, old.author_id);
+  if target_author_id is null then return coalesce(new, old); end if;
+
+  update public.authors
+  set follower_count = (
+    select count(*) from public.follows
+    where author_id = target_author_id
+  )
+  where id = target_author_id;
+  return coalesce(new, old);
+end;
+$$ language plpgsql;
+
+drop trigger if exists follows_sync_author_count on public.follows;
+create trigger follows_sync_author_count
+  after insert or delete on public.follows
+  for each row execute function public.sync_author_follower_count();
+
+
+-- ============================================================
+-- RLS — Các bảng mới
+-- ============================================================
+alter table public.authors    enable row level security;
+alter table public.ratings    enable row level security;
+alter table public.comments   enable row level security;
+alter table public.book_views enable row level security;
+
+-- authors: ai cũng đọc, chỉ admin insert/update (qua service role)
+create policy "authors_read"  on public.authors for select using (true);
+
+-- ratings: ai cũng đọc, chỉ owner write
+create policy "ratings_read"  on public.ratings for select using (true);
+create policy "ratings_write" on public.ratings for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- comments: ai cũng đọc, chỉ owner write
+create policy "comments_read"  on public.comments for select using (true);
+create policy "comments_write" on public.comments for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- book_views: insert tự do (cả guest), không ai xoá
+create policy "book_views_insert" on public.book_views for insert with check (true);
+create policy "book_views_read"   on public.book_views for select using (true);
