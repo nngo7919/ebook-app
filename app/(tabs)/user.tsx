@@ -1,7 +1,6 @@
 import { useAuth } from "@/app/lib/auth";
 import { useRouter } from "expo-router";
 import {
-  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -50,11 +49,13 @@ const MENU_SECTIONS = [
 
 export default function UserScreen() {
   const router = useRouter();
-  const { user, profile, signOut } = useAuth();
+  const { user, profile, signOut, isGuest } = useAuth();
 
-  const displayName = profile?.display_name ?? user?.email ?? "Người dùng";
-  const avatarLetter = displayName.charAt(0).toUpperCase();
-  const isLoggedIn = !!user;
+  const displayName = isGuest
+    ? "Khách"
+    : (profile?.display_name ?? user?.email?.split("@")[0] ?? "Người dùng");
+  const avatarLetter = isGuest ? "K" : displayName.charAt(0).toUpperCase();
+  const isLoggedIn = !!user && !isGuest;
 
   async function handleLogout() {
     await signOut();
@@ -73,11 +74,11 @@ export default function UserScreen() {
         <TouchableOpacity
           style={styles.profile}
           onPress={() =>
-            isLoggedIn ? router.push("/profile") : router.push("/auth/login")
+            isLoggedIn ? router.push("/profile") : router.push("/auth/login" as any)
           }
         >
-          <View style={[styles.avatar, isLoggedIn && styles.avatarLoggedIn]}>
-            {isLoggedIn ? (
+          <View style={[styles.avatar, isLoggedIn && styles.avatarLoggedIn, isGuest && styles.avatarGuest]}>
+            {(isLoggedIn || isGuest) ? (
               <Text style={styles.avatarLetter}>{avatarLetter}</Text>
             ) : (
               <Text style={styles.avatarText}>👤</Text>
@@ -86,37 +87,55 @@ export default function UserScreen() {
           <View style={styles.profileInfo}>
             <Text style={styles.profileName}>{displayName}</Text>
             <Text style={styles.profileSub}>
-              {isLoggedIn ? user?.email : "Đăng nhập để lưu tiến độ đọc"}
+              {isGuest
+                ? "Đang dùng chế độ khách"
+                : isLoggedIn
+                  ? user?.email
+                  : "Đăng nhập để lưu tiến độ đọc"}
             </Text>
           </View>
           <Text style={styles.arrow}>›</Text>
         </TouchableOpacity>
 
-        {/* Login/Logout button */}
-        {!isLoggedIn ? (
+        {/* Banner cho guest — khuyến khích đăng nhập */}
+        {isGuest && (
+          <View style={styles.guestBanner}>
+            <Text style={styles.guestBannerTitle}>Bạn đang dùng chế độ khách</Text>
+            <Text style={styles.guestBannerSub}>
+              Đăng nhập để lưu tiến độ đọc, yêu thích và lịch sử trên tất cả thiết bị.
+            </Text>
+            <TouchableOpacity
+              style={styles.guestBannerBtn}
+              onPress={() => router.push("/auth/login" as any)}
+            >
+              <Text style={styles.guestBannerBtnText}>Đăng nhập / Đăng ký</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Login button cho chưa đăng nhập */}
+        {!isLoggedIn && !isGuest && (
           <TouchableOpacity
             style={styles.loginBtn}
-            onPress={() => router.push("/auth/login")}
+            onPress={() => router.push("/auth/login" as any)}
           >
             <Text style={styles.loginBtnText}>Đăng nhập / Đăng ký</Text>
           </TouchableOpacity>
-        ) : null}
+        )}
 
-        {/* Menu sections */}
-        {MENU_SECTIONS.map((section, si) => (
+        {/* Menu sections — ẩn "Lịch sử trên tài khoản" cho guest */}
+        {MENU_SECTIONS.filter(s =>
+          isGuest ? s.title !== "LỊCH SỬ TRÊN TÀI KHOẢN" : true
+        ).map((section, si) => (
           <View key={si} style={styles.section}>
             <Text style={styles.sectionLabel}>{section.title}</Text>
             {section.items.map((item, ii) => (
               <TouchableOpacity
                 key={ii}
                 style={styles.menuItem}
-                onPress={() => {
-                  if (item.route) {
-                    router.push(item.route as any);
-                  } else {
-                    Alert.alert("Sắp ra mắt", "Tính năng này đang được phát triển.");
-                  }
-                }}
+                onPress={() =>
+                  item.route ? router.push(item.route as any) : null
+                }
               >
                 <Text style={styles.menuIcon}>{item.icon}</Text>
                 <Text style={styles.menuLabel}>{item.label}</Text>
@@ -181,7 +200,37 @@ const styles = StyleSheet.create({
   },
   profileSub: { color: "#888", fontSize: 13 },
 
-  // Login button
+  avatarGuest: { backgroundColor: "#555" },
+
+  // Guest banner
+  guestBanner: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#333",
+  },
+  guestBannerTitle: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 6,
+  },
+  guestBannerSub: {
+    color: "#888",
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  guestBannerBtn: {
+    backgroundColor: PINK,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  guestBannerBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
   loginBtn: {
     marginHorizontal: 16,
     marginBottom: 16,

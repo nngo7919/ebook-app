@@ -1,13 +1,15 @@
-// ============================================================
-// app/author/[id].tsx — Trang tác giả
-// ============================================================
-
-import { authors as authorsApi, follows } from "@/app/lib/api";
+import {
+	authors as authorsApi,
+	follows as followsApi,
+} from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
 import type { Author, Book } from "@/app/lib/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
+	ActivityIndicator,
+	Alert,
+	Dimensions,
 	FlatList,
 	Image,
 	SafeAreaView,
@@ -19,35 +21,20 @@ import {
 } from "react-native";
 
 const PINK = "#e91e8c";
-const BOOK_W = 100;
-
-// Fake author data khi chưa có DB
-const FAKE_AUTHOR: Author = {
-	id: "fake-author-1",
-	name: "tntytn",
-	bio: "Tác giả chuyên viết truyện ngôn tình, hiện đại, xuyên thư. Đã xuất bản hơn 20 tác phẩm với tổng lượt đọc hàng triệu lượt.",
-	avatar_url: null,
-	verified: true,
-	follower_count: 3842,
-	created_at: new Date().toISOString(),
-	updated_at: new Date().toISOString(),
-	is_followed: false,
-};
-
-function formatCount(n: number) {
-	if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-	return String(n);
-}
+const { width } = Dimensions.get("window");
+const CARD_WIDTH = (width - 48) / 3;
 
 export default function AuthorScreen() {
 	const { id } = useLocalSearchParams<{ id: string }>();
 	const router = useRouter();
-	const { user } = useAuth();
+	const { user, isGuest } = useAuth();
 
 	const [author, setAuthor] = useState<Author | null>(null);
 	const [books, setBooks] = useState<Book[]>([]);
 	const [loading, setLoading] = useState(true);
-	const [followed, setFollowed] = useState(false);
+	const [following, setFollowing] = useState(false);
+	const [followLoading, setFollowLoading] = useState(false);
+	const [showFullBio, setShowFullBio] = useState(false);
 
 	useEffect(() => {
 		fetchData();
@@ -55,53 +42,115 @@ export default function AuthorScreen() {
 
 	async function fetchData() {
 		setLoading(true);
-
-		const { data: authorData } = await authorsApi.get(id, user?.id);
-		if (authorData) {
-			setAuthor(authorData);
-			setFollowed(authorData.is_followed ?? false);
-		} else {
-			setAuthor({ ...FAKE_AUTHOR, id });
+		const [authorRes, booksRes] = await Promise.all([
+			authorsApi.get(id, user?.id),
+			authorsApi.getBooks(id, { limit: 30, orderBy: "created_at" }),
+		]);
+		if (authorRes.data) {
+			setAuthor(authorRes.data);
+			setFollowing(authorRes.data.is_followed ?? false);
 		}
-
-		const { data: booksData } = await authorsApi.getBooks(id, { limit: 20 });
-		setBooks(booksData ?? []);
-
+		if (booksRes.data) setBooks(booksRes.data);
 		setLoading(false);
 	}
 
-	async function handleToggleFollow() {
-		if (!user) {
-			router.push("/auth/login");
+	async function handleFollowToggle() {
+		if (!user || isGuest) {
+			Alert.alert(
+				"Cần đăng nhập",
+				"Vui lòng đăng nhập để theo dõi tác giả.",
+				[
+					{ text: "Để sau", style: "cancel" },
+					{ text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+				],
+			);
 			return;
 		}
-		const { data: newState } = await follows.toggle(user.id, id);
+		setFollowLoading(true);
+		const { data: newState } = await followsApi.toggle(user.id, id);
 		if (newState !== null) {
-			setFollowed(newState);
+			setFollowing(newState);
 			setAuthor((prev) =>
 				prev
 					? {
 						...prev,
 						follower_count: prev.follower_count + (newState ? 1 : -1),
+						is_followed: newState,
 					}
-					: prev
+					: prev,
 			);
 		}
+		setFollowLoading(false);
+	}
+
+	function formatFollowers(count: number) {
+		if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+		if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+		return count.toString();
+	}
+
+	function BookCard({ item }: { item: Book }) {
+		return (
+			<TouchableOpacity
+				style={s.bookCard}
+				onPress={() =>
+					router.push({ pathname: "/book/[id]", params: { id: item.id } })
+				}
+			>
+				<View style={s.bookCover}>
+					{item.cover_url ? (
+						<Image source={{ uri: item.cover_url }} style={s.coverImg} />
+					) : (
+						<View style={s.coverPlaceholder}>
+							<Text style={s.coverEmoji}>
+								{item.tag === "novel" ? "📖" : "📚"}
+							</Text>
+						</View>
+					)}
+					{item.is_full && (
+						<View style={s.fullBadge}>
+							<Text style={s.fullBadgeText}>FULL</Text>
+						</View>
+					)}
+				</View>
+				<Text style={s.bookTitle} numberOfLines={2}>
+					{item.title}
+				</Text>
+				<Text style={s.bookChapters}>
+					{item.total_chapters ?? 0} chương
+				</Text>
+			</TouchableOpacity>
+		);
 	}
 
 	if (loading) {
 		return (
 			<SafeAreaView style={s.container}>
 				<View style={s.center}>
-					<Text style={s.loadingText}>Đang tải...</Text>
+					<ActivityIndicator color={PINK} />
 				</View>
 			</SafeAreaView>
 		);
 	}
 
-	if (!author) return null;
+	if (!author) {
+		return (
+			<SafeAreaView style={s.container}>
+				<View style={s.header}>
+					<TouchableOpacity onPress={() => router.back()} style={s.headerBtn}>
+						<Text style={s.headerBack}>←</Text>
+					</TouchableOpacity>
+				</View>
+				<View style={s.center}>
+					<Text style={s.emptyText}>Không tìm thấy tác giả</Text>
+				</View>
+			</SafeAreaView>
+		);
+	}
 
-	const avatarLetter = author.name.charAt(0).toUpperCase();
+	const bioText = author.bio ?? "Chưa có giới thiệu.";
+	const bioTruncated = bioText.length > 120 && !showFullBio;
+	const displayBio = bioTruncated ? bioText.slice(0, 120) + "..." : bioText;
 
 	return (
 		<SafeAreaView style={s.container}>
@@ -111,21 +160,22 @@ export default function AuthorScreen() {
 					<Text style={s.headerBack}>←</Text>
 				</TouchableOpacity>
 				<Text style={s.headerTitle} numberOfLines={1}>
-					{author.name}
+					Tác Giả
 				</Text>
 				<View style={{ width: 36 }} />
 			</View>
 
 			<ScrollView showsVerticalScrollIndicator={false}>
-				{/* Author info */}
-				<View style={s.profileSection}>
-					{/* Avatar */}
+				{/* Avatar + tên + follow */}
+				<View style={s.heroSection}>
 					<View style={s.avatarWrap}>
 						{author.avatar_url ? (
 							<Image source={{ uri: author.avatar_url }} style={s.avatar} />
 						) : (
-							<View style={[s.avatar, s.avatarPlaceholder]}>
-								<Text style={s.avatarLetter}>{avatarLetter}</Text>
+							<View style={s.avatarPlaceholder}>
+								<Text style={s.avatarLetter}>
+									{author.name.charAt(0).toUpperCase()}
+								</Text>
 							</View>
 						)}
 						{author.verified && (
@@ -135,87 +185,75 @@ export default function AuthorScreen() {
 						)}
 					</View>
 
-					{/* Name + stats */}
 					<Text style={s.authorName}>{author.name}</Text>
 
+					{/* Stats row */}
 					<View style={s.statsRow}>
-						<View style={s.statItem}>
-							<Text style={s.statValue}>{formatCount(author.follower_count)}</Text>
-							<Text style={s.statLabel}>Người theo dõi</Text>
-						</View>
-						<View style={s.statDivider} />
 						<View style={s.statItem}>
 							<Text style={s.statValue}>{books.length}</Text>
 							<Text style={s.statLabel}>Tác phẩm</Text>
 						</View>
+						<View style={s.statDivider} />
+						<View style={s.statItem}>
+							<Text style={s.statValue}>
+								{formatFollowers(author.follower_count)}
+							</Text>
+							<Text style={s.statLabel}>Người theo dõi</Text>
+						</View>
+						<View style={s.statDivider} />
+						<View style={s.statItem}>
+							<Text style={s.statValue}>
+								{books.filter((b) => b.is_full).length}
+							</Text>
+							<Text style={s.statLabel}>Đã hoàn</Text>
+						</View>
 					</View>
-
-					{/* Bio */}
-					{author.bio ? (
-						<Text style={s.bio}>{author.bio}</Text>
-					) : null}
 
 					{/* Follow button */}
 					<TouchableOpacity
-						style={[s.followBtn, followed && s.followBtnActive]}
-						onPress={handleToggleFollow}
+						style={[s.followBtn, following && s.followBtnActive]}
+						onPress={handleFollowToggle}
+						disabled={followLoading}
 					>
-						<Text style={[s.followBtnText, followed && s.followBtnTextActive]}>
-							{followed ? "✓ Đang theo dõi" : "+ Theo dõi"}
-						</Text>
+						{followLoading ? (
+							<ActivityIndicator color={following ? PINK : "#fff"} size="small" />
+						) : (
+							<Text style={[s.followBtnText, following && s.followBtnTextActive]}>
+								{following ? "✓ Đang theo dõi" : "+ Theo dõi"}
+							</Text>
+						)}
 					</TouchableOpacity>
 				</View>
 
-				{/* Books */}
-				<View style={s.booksSection}>
-					<Text style={s.sectionTitle}>Tác phẩm</Text>
+				{/* Giới thiệu */}
+				<View style={s.bioSection}>
+					<Text style={s.sectionTitle}>Giới thiệu</Text>
+					<Text style={s.bioText}>{displayBio}</Text>
+					{bioText.length > 120 && (
+						<TouchableOpacity onPress={() => setShowFullBio((v) => !v)}>
+							<Text style={s.bioToggle}>
+								{showFullBio ? "Thu gọn ▲" : "Xem thêm ▼"}
+							</Text>
+						</TouchableOpacity>
+					)}
+				</View>
 
+				{/* Danh sách tác phẩm */}
+				<View style={s.booksSection}>
+					<Text style={s.sectionTitle}>
+						Tác phẩm ({books.length})
+					</Text>
 					{books.length === 0 ? (
-						<Text style={s.emptyText}>Chưa có tác phẩm nào</Text>
+						<Text style={s.emptyText}>Chưa có tác phẩm nào.</Text>
 					) : (
 						<FlatList
 							data={books}
 							keyExtractor={(item) => item.id}
-							horizontal
-							showsHorizontalScrollIndicator={false}
-							contentContainerStyle={s.bookList}
-							renderItem={({ item }) => (
-								<TouchableOpacity
-									style={s.bookCard}
-									onPress={() =>
-										router.push({
-											pathname: "/book/[id]",
-											params: { id: item.id },
-										})
-									}
-								>
-									<View style={s.bookCover}>
-										{item.cover_url ? (
-											<Image
-												source={{ uri: item.cover_url }}
-												style={s.coverImage}
-											/>
-										) : (
-											<View style={s.coverPlaceholder}>
-												<Text style={{ fontSize: 28 }}>
-													{item.tag === "novel" ? "📖" : "📚"}
-												</Text>
-											</View>
-										)}
-										{item.is_full && (
-											<View style={s.fullBadge}>
-												<Text style={s.fullBadgeText}>FULL</Text>
-											</View>
-										)}
-									</View>
-									<Text style={s.bookTitle} numberOfLines={2}>
-										{item.title}
-									</Text>
-									<Text style={s.bookChapters}>
-										{item.total_chapters} chương
-									</Text>
-								</TouchableOpacity>
-							)}
+							numColumns={3}
+							scrollEnabled={false}
+							columnWrapperStyle={s.bookRow}
+							contentContainerStyle={s.bookGrid}
+							renderItem={({ item }) => <BookCard item={item} />}
 						/>
 					)}
 				</View>
@@ -229,50 +267,44 @@ export default function AuthorScreen() {
 const s = StyleSheet.create({
 	container: { flex: 1, backgroundColor: "#0d0d0d" },
 	center: { flex: 1, alignItems: "center", justifyContent: "center" },
-	loadingText: { color: "#888" },
 
 	// Header
 	header: {
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "space-between",
-		paddingHorizontal: 8,
+		paddingHorizontal: 16,
 		paddingVertical: 12,
 	},
-	headerBtn: {
-		width: 36,
-		height: 36,
-		alignItems: "center",
-		justifyContent: "center",
-	},
+	headerBtn: { width: 36, height: 36, alignItems: "center", justifyContent: "center" },
 	headerBack: { color: PINK, fontSize: 22, fontWeight: "bold" },
-	headerTitle: {
-		flex: 1,
-		color: "#fff",
-		fontSize: 17,
-		fontWeight: "bold",
-		textAlign: "center",
+	headerTitle: { color: "#fff", fontSize: 17, fontWeight: "bold" },
+
+	// Hero
+	heroSection: {
+		alignItems: "center",
+		paddingVertical: 28,
+		paddingHorizontal: 24,
 	},
-
-	// Profile
-	profileSection: { alignItems: "center", paddingHorizontal: 24, paddingBottom: 24 },
-
 	avatarWrap: { position: "relative", marginBottom: 16 },
-	avatar: { width: 96, height: 96, borderRadius: 48 },
+	avatar: { width: 90, height: 90, borderRadius: 45 },
 	avatarPlaceholder: {
-		backgroundColor: PINK,
+		width: 90,
+		height: 90,
+		borderRadius: 45,
+		backgroundColor: "#333",
 		alignItems: "center",
 		justifyContent: "center",
 	},
-	avatarLetter: { color: "#fff", fontSize: 38, fontWeight: "800" },
+	avatarLetter: { color: "#fff", fontSize: 36, fontWeight: "700" },
 	verifiedBadge: {
 		position: "absolute",
-		bottom: 2,
-		right: 2,
+		bottom: 0,
+		right: 0,
 		width: 24,
 		height: 24,
 		borderRadius: 12,
-		backgroundColor: "#3498db",
+		backgroundColor: "#4a9eff",
 		alignItems: "center",
 		justifyContent: "center",
 		borderWidth: 2,
@@ -284,61 +316,65 @@ const s = StyleSheet.create({
 		color: "#fff",
 		fontSize: 22,
 		fontWeight: "800",
-		marginBottom: 16,
+		marginBottom: 20,
 		textAlign: "center",
 	},
 
+	// Stats
 	statsRow: {
 		flexDirection: "row",
 		alignItems: "center",
-		marginBottom: 16,
-		gap: 32,
+		marginBottom: 24,
+		backgroundColor: "#161616",
+		borderRadius: 14,
+		paddingVertical: 16,
+		paddingHorizontal: 24,
+		gap: 0,
 	},
-	statItem: { alignItems: "center" },
-	statValue: { color: "#fff", fontSize: 20, fontWeight: "700" },
-	statLabel: { color: "#888", fontSize: 12, marginTop: 2 },
-	statDivider: { width: 1, height: 32, backgroundColor: "#222" },
+	statItem: { flex: 1, alignItems: "center" },
+	statValue: { color: "#fff", fontSize: 18, fontWeight: "700" },
+	statLabel: { color: "#666", fontSize: 12, marginTop: 3 },
+	statDivider: { width: 1, height: 32, backgroundColor: "#2a2a2a" },
 
-	bio: {
-		color: "#aaa",
-		fontSize: 14,
-		lineHeight: 22,
-		textAlign: "center",
-		marginBottom: 20,
-	},
-
+	// Follow button
 	followBtn: {
 		borderWidth: 1.5,
 		borderColor: PINK,
 		borderRadius: 24,
 		paddingVertical: 10,
 		paddingHorizontal: 36,
+		minWidth: 160,
+		alignItems: "center",
 	},
-	followBtnActive: { backgroundColor: PINK },
-	followBtnText: { color: PINK, fontSize: 15, fontWeight: "600" },
-	followBtnTextActive: { color: "#fff" },
+	followBtnActive: { backgroundColor: "#1a0812" },
+	followBtnText: { color: PINK, fontSize: 15, fontWeight: "700" },
+	followBtnTextActive: { color: PINK },
 
-	// Books section
-	booksSection: { paddingBottom: 8 },
+	// Bio
+	bioSection: { paddingHorizontal: 20, marginBottom: 24 },
 	sectionTitle: {
 		color: "#fff",
-		fontSize: 17,
-		fontWeight: "bold",
-		paddingHorizontal: 16,
-		marginBottom: 12,
+		fontSize: 16,
+		fontWeight: "700",
+		marginBottom: 10,
 	},
-	emptyText: { color: "#555", fontSize: 14, paddingHorizontal: 16 },
-	bookList: { paddingHorizontal: 16, gap: 12 },
-	bookCard: { width: BOOK_W },
+	bioText: { color: "#aaa", fontSize: 14, lineHeight: 22 },
+	bioToggle: { color: PINK, fontSize: 13, marginTop: 6 },
+
+	// Books grid
+	booksSection: { paddingHorizontal: 16, marginBottom: 8 },
+	bookGrid: { gap: 0 },
+	bookRow: { gap: 12, marginBottom: 16 },
+	bookCard: { width: CARD_WIDTH },
 	bookCover: {
-		width: BOOK_W,
-		height: BOOK_W * 1.4,
+		width: CARD_WIDTH,
+		height: CARD_WIDTH * 1.4,
 		borderRadius: 8,
 		overflow: "hidden",
 		marginBottom: 6,
 		position: "relative",
 	},
-	coverImage: { width: "100%", height: "100%", resizeMode: "cover" },
+	coverImg: { width: "100%", height: "100%", resizeMode: "cover" },
 	coverPlaceholder: {
 		width: "100%",
 		height: "100%",
@@ -346,16 +382,19 @@ const s = StyleSheet.create({
 		alignItems: "center",
 		justifyContent: "center",
 	},
+	coverEmoji: { fontSize: 28 },
 	fullBadge: {
 		position: "absolute",
 		top: 0,
-		right: 0,
+		left: 0,
 		backgroundColor: "#2ecc71",
 		paddingHorizontal: 5,
 		paddingVertical: 2,
-		borderBottomLeftRadius: 6,
+		borderBottomRightRadius: 6,
 	},
 	fullBadgeText: { color: "#fff", fontSize: 9, fontWeight: "bold" },
-	bookTitle: { color: "#ccc", fontSize: 12, lineHeight: 16 },
-	bookChapters: { color: "#666", fontSize: 11, marginTop: 2 },
+	bookTitle: { color: "#ddd", fontSize: 12, lineHeight: 16, marginBottom: 2 },
+	bookChapters: { color: "#555", fontSize: 11 },
+
+	emptyText: { color: "#666", fontSize: 14, paddingVertical: 20 },
 });

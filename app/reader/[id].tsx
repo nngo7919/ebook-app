@@ -38,7 +38,7 @@ export default function ReaderScreen() {
     chapter?: string;
   }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
 
   const [bookTitle, setBookTitle] = useState("");
   const [totalChapters, setTotalChapters] = useState(1);
@@ -119,7 +119,7 @@ export default function ReaderScreen() {
     setScrollProgress(clamped);
 
     // Tự động lưu progress (debounce đơn giản bằng cách chỉ lưu mỗi 5%)
-    if (user && Math.round(clamped * 100) % 5 === 0) {
+    if (user && !isGuest && Math.round(clamped * 100) % 5 === 0) {
       progressApi.save(user.id, id, currentChapter, clamped * 100);
     }
   }

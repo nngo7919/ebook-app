@@ -5,7 +5,6 @@ import {
 } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
 import { FAKE_LIBRARY_ITEMS, FAKE_MY_BOOKS } from "@/app/lib/fake-data";
-import type { UserLibraryItem } from "@/app/lib/types";
 import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -26,77 +25,95 @@ const { width } = Dimensions.get("window");
 const CARD_WIDTH = 140;
 const CARD_HEIGHT = CARD_WIDTH * 1.4;
 
+type MyBook = {
+  id: string;
+  title: string;
+  author: string;
+  tag: string;
+  source: "download" | "upload";
+  book_id: string;
+  cover_url?: string;
+};
+
 export default function MyLibraryScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [recentBooks, setRecentBooks] = useState<UserLibraryItem[]>([]);
-  const [favoriteBooks, setFavoriteBooks] = useState<UserLibraryItem[]>([]);
-  const [downloadedBooks, setDownloadedBooks] = useState<UserLibraryItem[]>([]);
+  const { user, isGuest } = useAuth();
+  const [recentBooks, setRecentBooks] = useState<MyBook[]>([]);
+  const [favoriteBooks, setFavoriteBooks] = useState<MyBook[]>([]);
+  const [downloadedBooks, setDownloadedBooks] = useState<MyBook[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
 
   async function fetchMyBooks() {
     setLoading(true);
 
+    const isLoggedInUser = user && !isGuest;
+
     // Đọc gần đây
-    const recentResult = user
+    const recentResult = isLoggedInUser
       ? await progressApi.recentBooks(user.id, 6)
       : { data: null };
     const recentMapped = (recentResult.data ?? []).map((r) => ({
       id: r.book_id,
-      user_id: user?.id ?? "",
       title: r.book.title,
-      author_id: null,
       author: r.book.author,
       tag: r.book.tag,
       source: "download" as const,
-      file_path: null,
-      created_at: new Date().toISOString(),
       book_id: r.book_id,
-      cover_url: r.book.cover_url ?? null,
+      cover_url: r.book.cover_url ?? undefined,
     }));
-    setRecentBooks(recentMapped.length > 0 ? recentMapped : FAKE_MY_BOOKS);
+    const fakeMapped: MyBook[] = FAKE_MY_BOOKS.map((b) => ({
+      id: b.id,
+      title: b.title,
+      author: b.author,
+      tag: b.tag,
+      source: b.source,
+      book_id: b.book_id ?? b.id,
+      cover_url: b.cover_url ?? undefined,
+    }));
+
+    setRecentBooks(recentMapped.length > 0 ? recentMapped : fakeMapped);
 
     // Yêu thích
-    const favResult = user ? await favApi.list(user.id) : { data: null };
+    const favResult = isLoggedInUser ? await favApi.list(user.id) : { data: null };
     const favMapped = (favResult.data ?? []).slice(0, 6).map((b) => ({
       id: b.id,
-      user_id: user?.id ?? "",
       title: b.title,
-      author_id: null,
       author: b.author,
       tag: b.tag,
       source: "download" as const,
-      file_path: null,
-      created_at: new Date().toISOString(),
       book_id: b.id,
-      cover_url: b.cover_url ?? null,
+      cover_url: b.cover_url ?? undefined,
     }));
     setFavoriteBooks(
-      favMapped.length > 0 ? favMapped : FAKE_MY_BOOKS.slice(0, 3),
+      favMapped.length > 0 ? favMapped : fakeMapped.slice(0, 3),
     );
 
     // Đã tải
-    const dlResult = user
+    const dlResult = isLoggedInUser
       ? await libApi.list(user.id, { source: "download" })
       : { data: null };
     const dlMapped = (dlResult.data ?? []).slice(0, 6).map((item) => ({
       id: item.id,
-      user_id: user?.id ?? "",
       title: item.title,
-      author_id: null,
       author: item.author,
       tag: item.tag,
       source: item.source,
-      file_path: null,
-      created_at: new Date().toISOString(),
       book_id: item.book_id ?? item.id,
-      cover_url: item.cover_url ?? null,
+      cover_url: item.cover_url ?? undefined,
     }));
     setDownloadedBooks(
       dlMapped.length > 0
         ? dlMapped
-        : FAKE_LIBRARY_ITEMS,
+        : FAKE_LIBRARY_ITEMS.map((item) => ({
+          id: item.id,
+          title: item.title,
+          author: item.author,
+          tag: item.tag,
+          source: item.source,
+          book_id: item.book_id ?? item.id,
+          cover_url: item.cover_url ?? undefined,
+        })),
     );
 
     setLoading(false);
@@ -107,8 +124,15 @@ export default function MyLibraryScreen() {
   }, [user]); // eslint-disable-line
 
   async function handleUpload() {
-    if (!user) {
-      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để tải truyện.");
+    if (!user || isGuest) {
+      Alert.alert(
+        "Cần đăng nhập",
+        "Vui lòng đăng nhập để tải truyện lên thư viện.",
+        [
+          { text: "Để sau", style: "cancel" },
+          { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+        ],
+      );
       return;
     }
 
@@ -155,7 +179,7 @@ export default function MyLibraryScreen() {
     }
   }
 
-  function BookCard({ item }: { item: UserLibraryItem }) {
+  function BookCard({ item }: { item: MyBook }) {
     return (
       <TouchableOpacity
         style={styles.card}
@@ -225,6 +249,20 @@ export default function MyLibraryScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Banner cho guest */}
+        {isGuest && (
+          <View style={styles.guestBanner}>
+            <Text style={styles.guestBannerIcon}>📚</Text>
+            <Text style={styles.guestBannerTitle}>
+              Đăng nhập để lưu thư viện
+            </Text>
+            <Text style={styles.guestBannerSub}>
+              Tiến độ đọc, yêu thích và sách đã tải sẽ được đồng bộ khi bạn
+              đăng nhập.
+            </Text>
+          </View>
+        )}
+
         {/* Đọc Gần Đây */}
         <SectionHeader
           title="Đang Đọc · Thiết Bị"
@@ -401,5 +439,32 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#555",
     fontSize: 13,
+  },
+
+  // Guest banner
+  guestBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    alignItems: "center",
+    gap: 6,
+  },
+  guestBannerIcon: { fontSize: 32, marginBottom: 4 },
+  guestBannerTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  guestBannerSub: {
+    color: "#777",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 18,
   },
 });

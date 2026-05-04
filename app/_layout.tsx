@@ -34,6 +34,7 @@ export default function RootLayout() {
           <Stack.Screen name="book-list" options={{ headerShown: false }} />
           <Stack.Screen name="profile" options={{ headerShown: false }} />
           <Stack.Screen name="book/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="author/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="reader/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="toc/[id]" options={{ headerShown: false }} />
           <Stack.Screen
