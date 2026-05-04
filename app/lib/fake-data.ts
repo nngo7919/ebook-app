@@ -3,10 +3,9 @@
 // Xóa file này hoặc không import nữa khi backend sẵn sàng
 // ============================================================
 
-import type { Book, Chapter, UserLibraryItem } from "./types";
+import type { Author, Book, Chapter, UserLibraryItem } from "./types";
 
 const BOOK_DEFAULTS = {
-	author_id: null,
 	rating_avg: 0,
 	rating_count: 0,
 	comment_count: 0,
@@ -14,12 +13,116 @@ const BOOK_DEFAULTS = {
 	deleted_at: null,
 } as const;
 
+// ── AUTHORS ──────────────────────────────────────────────────
+
+export const FAKE_AUTHORS: Author[] = [
+	{
+		id: "author-1",
+		name: "Nhĩ Căn",
+		bio: "Tác giả nổi tiếng với thể loại Tiên Hiệp và Huyền Huyễn. Bút danh thật là Vong Vũ, từng gây bão cộng đồng đọc truyện online với bộ \"Tiên Nghịch\" hơn 2000 chương. Phong cách viết mạnh mẽ, hào sảng, xây dựng thế giới quan rộng lớn.",
+		avatar_url: null,
+		verified: true,
+		follower_count: 128400,
+		created_at: new Date("2018-03-12").toISOString(),
+		updated_at: new Date().toISOString(),
+		is_followed: false,
+	},
+	{
+		id: "author-2",
+		name: "Phát Tiểu Tiểu Tiêu",
+		bio: "Chuyên viết Kinh Dị và Mạt Thế. Nổi bật với \"Khủng Bố Sống Lại\" — bộ truyện zombie hậu tận thế đầy kịch tính với hơn 1600 chương. Văn phong giàu hành động, tình tiết gay cấn, hút người đọc từ chương đầu.",
+		avatar_url: null,
+		verified: true,
+		follower_count: 87200,
+		created_at: new Date("2019-07-05").toISOString(),
+		updated_at: new Date().toISOString(),
+		is_followed: false,
+	},
+	{
+		id: "author-3",
+		name: "Viện Kinh Phong",
+		bio: "Tác giả quen thuộc của dòng Điền Văn và Cổ Đại ngôn tình. Câu chuyện thường xoay quanh cuộc sống thôn quê bình dị nhưng ẩm áp, tình cảm gia đình và mối tình thủy chung. Đặc biệt được yêu thích bởi độc giả nữ.",
+		avatar_url: null,
+		verified: false,
+		follower_count: 43100,
+		created_at: new Date("2020-11-20").toISOString(),
+		updated_at: new Date().toISOString(),
+		is_followed: true,
+	},
+	{
+		id: "author-4",
+		name: "Nguyệt Dạ Hồng Liên",
+		bio: "Bút danh thơ mộng, nội dung sắc bén. Chuyên Niên Đại và Sảng Văn — những bộ truyện phụ nữ tự lập, không cần dựa dẫm. \"Dọn Sạch Cả Nhà, Ta Xuống Nông Thôn\" là tác phẩm đình đám nhất, đạt hơn 72.000 lượt xem.",
+		avatar_url: null,
+		verified: false,
+		follower_count: 31800,
+		created_at: new Date("2021-02-14").toISOString(),
+		updated_at: new Date().toISOString(),
+		is_followed: false,
+	},
+	{
+		id: "author-5",
+		name: "Đại Nguyên Từ Nha",
+		bio: "Tác giả nữ chuyên Ngôn Tình hiện đại và Niên Đại. Nổi tiếng với các cặp đôi nam chính điển trai, lạnh lùng nhưng sủng vợ hết mức. Cốt truyện nhẹ nhàng, lãng mạn, phù hợp đọc trước khi ngủ.",
+		avatar_url: null,
+		verified: false,
+		follower_count: 29500,
+		created_at: new Date("2021-09-03").toISOString(),
+		updated_at: new Date().toISOString(),
+		is_followed: false,
+	},
+	{
+		id: "author-6",
+		name: "Hằng Nha Nha",
+		bio: "Chuyên thể loại Sủng Văn và HE — đảm bảo happy ending tuyệt đối. Tác phẩm \"Đóa Hoa Lạnh Lùng Nhà Bên Yêu Tôi\" được cộng đồng đọc truyện đánh giá là \"ngọt đến sâu răng\". Phong cách viết nhẹ nhàng, dễ chịu.",
+		avatar_url: null,
+		verified: false,
+		follower_count: 18700,
+		created_at: new Date("2022-04-18").toISOString(),
+		updated_at: new Date().toISOString(),
+		is_followed: false,
+	},
+	{
+		id: "author-7",
+		name: "tntytn",
+		bio: "Tác giả trẻ, mới nổi trong cộng đồng đọc truyện online. Chuyên xuyên thư và hài hước. Hiện đang viết \"Trọng Sinh Trong Sách Pháo Hôi\" — bộ truyện có cái tên dài nhất app nhưng cực kỳ cuốn.",
+		avatar_url: null,
+		verified: false,
+		follower_count: 4300,
+		created_at: new Date("2023-08-11").toISOString(),
+		updated_at: new Date().toISOString(),
+		is_followed: true,
+	},
+	{
+		id: "author-8",
+		name: "Nha Nha Cật Tố",
+		bio: "Tác giả Đam Mỹ và Đô Thị hiện đại. Viết về những mối tình phức tạp, đan xen bóng tối và ánh sáng. Không ngại đề tài nhạy cảm, xây dựng tâm lý nhân vật sâu sắc và chân thực.",
+		avatar_url: null,
+		verified: false,
+		follower_count: 9200,
+		created_at: new Date("2022-12-01").toISOString(),
+		updated_at: new Date().toISOString(),
+		is_followed: false,
+	},
+];
+
+/** Map author name → Author object (dùng để lookup nhanh) */
+export const FAKE_AUTHOR_MAP: Record<string, Author> = Object.fromEntries(
+	FAKE_AUTHORS.map((a) => [a.name, a]),
+);
+
+/** Map author id → Author object */
+export const FAKE_AUTHOR_BY_ID: Record<string, Author> = Object.fromEntries(
+	FAKE_AUTHORS.map((a) => [a.id, a]),
+);
+
 // ── BOOKS ────────────────────────────────────────────────────
 
 export const FAKE_BOOKS: Book[] = [
 	{
 		...BOOK_DEFAULTS,
 		id: "1",
+		author_id: "author-2",
 		title: "Khủng Bố Sống Lại",
 		author: "Phát Tiểu Tiểu Tiêu",
 		cover_url: null,
@@ -38,6 +141,7 @@ export const FAKE_BOOKS: Book[] = [
 	{
 		...BOOK_DEFAULTS,
 		id: "2",
+		author_id: "author-7",
 		title: "Trọng Sinh Trong Sách Pháo Hôi Học Tra Người Qua Đường Giáp",
 		author: "tntytn",
 		cover_url: null,
@@ -56,6 +160,7 @@ export const FAKE_BOOKS: Book[] = [
 	{
 		...BOOK_DEFAULTS,
 		id: "3",
+		author_id: "author-3",
 		title: "Xuyên Thành Nông Nữ, Được Cả Nhà Cưng",
 		author: "Viện Kinh Phong",
 		cover_url: null,
@@ -74,6 +179,7 @@ export const FAKE_BOOKS: Book[] = [
 	{
 		...BOOK_DEFAULTS,
 		id: "4",
+		author_id: "author-4",
 		title: "Dọn Sạch Cả Nhà, Ta Xuống Nông Thôn",
 		author: "Nguyệt Dạ Hồng Liên",
 		cover_url: null,
@@ -92,6 +198,7 @@ export const FAKE_BOOKS: Book[] = [
 	{
 		...BOOK_DEFAULTS,
 		id: "5",
+		author_id: "author-5",
 		title: "Sau Khi Bắt Được Chồng Quân Nhân",
 		author: "Đại Nguyên Từ Nha",
 		cover_url: null,
@@ -110,6 +217,7 @@ export const FAKE_BOOKS: Book[] = [
 	{
 		...BOOK_DEFAULTS,
 		id: "6",
+		author_id: "author-8",
 		title: "Nhung Đen - Nha Nha Cật Tố Dã Cật N...",
 		author: "Nha Nha Cật Tố",
 		cover_url: null,
@@ -128,6 +236,7 @@ export const FAKE_BOOKS: Book[] = [
 	{
 		...BOOK_DEFAULTS,
 		id: "7",
+		author_id: "author-6",
 		title: "Đóa Hoa Lạnh Lùng Nhà Bên Yêu Tôi",
 		author: "Hằng Nha Nha",
 		cover_url: null,
@@ -146,6 +255,7 @@ export const FAKE_BOOKS: Book[] = [
 	{
 		...BOOK_DEFAULTS,
 		id: "8",
+		author_id: "author-1",
 		title: "Tiên Nghịch",
 		author: "Nhĩ Căn",
 		cover_url: null,

@@ -3,6 +3,10 @@ import {
 	follows as followsApi,
 } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
+import {
+	FAKE_AUTHOR_BY_ID,
+	FAKE_BOOKS,
+} from "@/app/lib/fake-data";
 import type { Author, Book } from "@/app/lib/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -46,11 +50,19 @@ export default function AuthorScreen() {
 			authorsApi.get(id, user?.id),
 			authorsApi.getBooks(id, { limit: 30, orderBy: "created_at" }),
 		]);
-		if (authorRes.data) {
-			setAuthor(authorRes.data);
-			setFollowing(authorRes.data.is_followed ?? false);
+
+		// Fallback sang fake data nếu Supabase lỗi/chưa setup
+		const authorData = authorRes.data ?? FAKE_AUTHOR_BY_ID[id] ?? null;
+		const booksData =
+			booksRes.data && booksRes.data.length > 0
+				? booksRes.data
+				: FAKE_BOOKS.filter((b) => b.author_id === id);
+
+		if (authorData) {
+			setAuthor(authorData);
+			setFollowing(authorData.is_followed ?? false);
 		}
-		if (booksRes.data) setBooks(booksRes.data);
+		setBooks(booksData);
 		setLoading(false);
 	}
 
