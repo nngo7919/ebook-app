@@ -18,11 +18,11 @@ import {
 const PINK = "#e91e8c";
 
 function formatMinutes(dateStr?: string) {
-  if (!dateStr) return "vài phút";
+  if (!dateStr) return "vÃ i phÃºt";
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
-  if (diff < 60) return `${diff} phút`;
-  if (diff < 1440) return `${Math.floor(diff / 60)} giờ`;
-  return `${Math.floor(diff / 1440)} ngày`;
+  if (diff < 60) return `${diff} phÃºt`;
+  if (diff < 1440) return `${Math.floor(diff / 60)} giá»`;
+  return `${Math.floor(diff / 1440)} ngÃ y`;
 }
 
 export default function BookDetailScreen() {
@@ -51,7 +51,7 @@ export default function BookDetailScreen() {
       setBook({ ...data, views: (data.views ?? 0) + 1 });
       void booksApi.incrementViews(id, { userId: user?.id });
     } else {
-      // Fake data — tìm trong FAKE_BOOKS theo id, nếu không có dùng phần tử đầu
+      // Fake data â tÃ¬m trong FAKE_BOOKS theo id, náº¿u khÃ´ng cÃ³ dÃ¹ng pháº§n tá»­ Äáº§u
       const fake = FAKE_BOOKS.find((b) => b.id === id) ?? FAKE_BOOKS[0];
       setBook({ ...fake, id });
     }
@@ -60,7 +60,7 @@ export default function BookDetailScreen() {
 
   async function handleToggleLike() {
     if (!user) {
-      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để thích truyện.");
+      Alert.alert("Cáº§n ÄÄng nháº­p", "Vui lÃ²ng ÄÄng nháº­p Äá» thÃ­ch truyá»n.");
       return;
     }
     const { data: newState } = await favApi.toggle(user.id, id);
@@ -71,7 +71,7 @@ export default function BookDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
-          <Text style={styles.loadingText}>Đang tải...</Text>
+          <Text style={styles.loadingText}>Äang táº£i...</Text>
         </View>
       </SafeAreaView>
     );
@@ -81,7 +81,7 @@ export default function BookDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
-          <Text style={styles.loadingText}>Không tìm thấy truyện</Text>
+          <Text style={styles.loadingText}>KhÃ´ng tÃ¬m tháº¥y truyá»n</Text>
         </View>
       </SafeAreaView>
     );
@@ -90,7 +90,7 @@ export default function BookDetailScreen() {
   const chapters = book.total_chapters ?? 17;
   const likes = book.likes ?? 57;
   const views = book.views ?? 101;
-  const authorName = book.author ?? "Äang cáº­p nháº­t";
+  const authorName = book.author ?? "Đang cập nhật";
   const ago = formatMinutes(book.created_at);
   const tags = book.genres
     ? book.genres.split(",").map((g) => g.trim())
@@ -109,17 +109,17 @@ export default function BookDetailScreen() {
           onPress={() => router.back()}
           style={styles.headerBtn}
         >
-          <Text style={styles.headerBack}>←</Text>
+          <Text style={styles.headerBack}>â</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
           {shortTitle}
         </Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.headerBtn}>
-            <Text style={styles.headerIcon}>⚑</Text>
+            <Text style={styles.headerIcon}>â</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerBtn}>
-            <Text style={styles.headerIcon}>⬆</Text>
+            <Text style={styles.headerIcon}>â¬</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -136,30 +136,30 @@ export default function BookDetailScreen() {
           <View style={styles.infoLeft}>
             {/* Author */}
             <View style={styles.infoLine}>
-              <Text style={styles.infoIcon}>✒</Text>
+              <Text style={styles.infoIcon}>â</Text>
             </View>
 
             {/* Status */}
             <View style={styles.infoLine}>
-              <Text style={styles.infoIcon}>☁</Text>
+              <Text style={styles.infoIcon}>â</Text>
               <Text style={styles.infoText}>
-                {book.is_full ? "Hoàn" : "Đang ra"}
+                {book.is_full ? "HoÃ n" : "Äang ra"}
                 {"  "}
-                <Text style={styles.infoMuted}>▸{ago}</Text>
+                <Text style={styles.infoMuted}>â¸{ago}</Text>
               </Text>
             </View>
 
             {/* Chapters */}
             <View style={styles.infoLine}>
-              <Text style={styles.infoIcon}>≡</Text>
+              <Text style={styles.infoIcon}>â¡</Text>
               <Text style={styles.infoText}>{chapters}</Text>
             </View>
 
             {/* Likes + views */}
             <View style={styles.infoLine}>
-              <Text style={styles.infoIcon}>♥</Text>
+              <Text style={styles.infoIcon}>â¥</Text>
               <Text style={styles.infoText}>{likes}</Text>
-              <Text style={[styles.infoIcon, { marginLeft: 16 }]}>◉</Text>
+              <Text style={[styles.infoIcon, { marginLeft: 16 }]}>â</Text>
               <Text style={styles.infoText}>{views}</Text>
             </View>
           </View>
@@ -174,7 +174,7 @@ export default function BookDetailScreen() {
             ) : (
               <View style={styles.coverPlaceholder}>
                 <Text style={{ fontSize: 36 }}>
-                  {book.tag === "novel" ? "📖" : "📚"}
+                  {book.tag === "novel" ? "ð" : "ð"}
                 </Text>
               </View>
             )}
@@ -203,29 +203,29 @@ export default function BookDetailScreen() {
             onPress={handleToggleLike}
           >
             <Text style={[styles.actionIcon, liked && styles.actionIconActive]}>
-              {liked ? "♥" : "♡"}
+              {liked ? "â¥" : "â¡"}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionIcon}>⊞</Text>
+            <Text style={styles.actionIcon}>â</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionIcon}>⊕</Text>
+            <Text style={styles.actionIcon}>â</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.actionBtn}
             onPress={() =>
-              Alert.alert("Thông báo", "Chức năng đang phát triển")
+              Alert.alert("ThÃ´ng bÃ¡o", "Chá»©c nÄng Äang phÃ¡t triá»n")
             }
           >
-            <Text style={styles.actionIcon}>⊕</Text>
+            <Text style={styles.actionIcon}>â</Text>
           </TouchableOpacity>
         </View>
 
         {/* Author info */}
         <View style={styles.authorRow}>
           <View style={styles.authorAvatar}>
-            <Text style={{ fontSize: 22 }}>👤</Text>
+            <Text style={{ fontSize: 22 }}>ð¤</Text>
           </View>
           <View>
             <Text style={styles.authorName}>{authorName}</Text>
@@ -234,7 +234,7 @@ export default function BookDetailScreen() {
         </View>
 
         {/* Recent chapters */}
-        <Text style={styles.sectionLabel}>Các số gần nhất</Text>
+        <Text style={styles.sectionLabel}>CÃ¡c sá» gáº§n nháº¥t</Text>
         <View style={styles.chapterRow}>
           {Array.from(
             { length: Math.min(5, chapters) },
@@ -257,7 +257,7 @@ export default function BookDetailScreen() {
 
         {/* Genres */}
         <View style={styles.genreSection}>
-          <Text style={styles.genreLabel}>Thể loại: </Text>
+          <Text style={styles.genreLabel}>Thá» loáº¡i: </Text>
           <View style={styles.genreWrap}>
             {allGenres.map((g, i) => (
               <TouchableOpacity
@@ -285,10 +285,10 @@ export default function BookDetailScreen() {
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.bottomDownload}
-          onPress={() => Alert.alert("Tải về", "Chức năng đang phát triển")}
+          onPress={() => Alert.alert("Táº£i vá»", "Chá»©c nÄng Äang phÃ¡t triá»n")}
         >
-          <Text style={styles.bottomDownloadIcon}>⬇</Text>
-          <Text style={styles.bottomDownloadText}>Tải Về</Text>
+          <Text style={styles.bottomDownloadIcon}>â¬</Text>
+          <Text style={styles.bottomDownloadText}>Táº£i Vá»</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -297,7 +297,7 @@ export default function BookDetailScreen() {
             router.push({ pathname: "/reader/[id]", params: { id: book.id } })
           }
         >
-          <Text style={styles.bottomReadText}>Đọc Truyện</Text>
+          <Text style={styles.bottomReadText}>Äá»c Truyá»n</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -306,8 +306,8 @@ export default function BookDetailScreen() {
             router.push({ pathname: "/toc/[id]", params: { id: book.id } })
           }
         >
-          <Text style={styles.bottomTocIcon}>≡</Text>
-          <Text style={styles.bottomTocText}>Mục Lục</Text>
+          <Text style={styles.bottomTocIcon}>â¡</Text>
+          <Text style={styles.bottomTocText}>Má»¥c Lá»¥c</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

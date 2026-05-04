@@ -1,6 +1,7 @@
 import { useAuth } from "@/app/lib/auth";
 import { useRouter } from "expo-router";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -109,9 +110,13 @@ export default function UserScreen() {
               <TouchableOpacity
                 key={ii}
                 style={styles.menuItem}
-                onPress={() =>
-                  item.route ? router.push(item.route as any) : null
-                }
+                onPress={() => {
+                  if (item.route) {
+                    router.push(item.route as any);
+                  } else {
+                    Alert.alert("Sắp ra mắt", "Tính năng này đang được phát triển.");
+                  }
+                }}
               >
                 <Text style={styles.menuIcon}>{item.icon}</Text>
                 <Text style={styles.menuLabel}>{item.label}</Text>

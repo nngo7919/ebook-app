@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import {
   Alert,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -28,53 +29,58 @@ function Icon({ type }: { type: string }) {
 const SECTIONS = [
   {
     key: "intro",
-    items: [{ icon: "edit", label: "Giới thiệu cá nhân", onPress: null }],
+    items: [{ icon: "edit", label: "Giới thiệu cá nhân", route: null, action: "coming_soon" }],
   },
   {
     key: "truyen",
     title: "TRUYỆN CỦA TÔI",
     items: [
-      { icon: "list", label: "Danh sách", onPress: null },
-      {
-        icon: "upload",
-        label: "Đăng truyện & nhận thưởng (web)",
-        onPress: null,
-      },
+      { icon: "list", label: "Danh sách", route: null, action: "coming_soon" },
+      { icon: "upload", label: "Đăng truyện & nhận thưởng (web)", route: null, action: "coming_soon" },
     ],
   },
   {
     key: "lichsu",
     title: "LỊCH SỬ",
     items: [
-      {
-        icon: "history",
-        label: "Truyện đã xem",
-        route: "/book-list?type=recent&title=Truyện Đã Xem",
-      },
-      {
-        icon: "heart",
-        label: "Truyện đã thích",
-        route: "/book-list?type=favorite&title=Truyện Đã Thích",
-      },
-      {
-        icon: "download",
-        label: "Truyện đã tải",
-        route: "/book-list?type=download&title=Truyện Đã Tải",
-      },
+      { icon: "history", label: "Truyện đã xem", route: "/book-list?type=recent&title=Truyện Đã Xem", action: null },
+      { icon: "heart", label: "Truyện đã thích", route: "/book-list?type=favorite&title=Truyện Đã Thích", action: null },
+      { icon: "download", label: "Truyện đã tải", route: "/book-list?type=download&title=Truyện Đã Tải", action: null },
+    ],
+  },
+  {
+    key: "logout",
+    title: "",
+    items: [
+      { icon: "logout", label: "Đăng xuất", route: null, action: "logout" },
     ],
   },
 ];
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, user } = useAuth();
+  const { profile, user, signOut } = useAuth();
 
   const displayName = profile?.display_name ?? user?.email?.split("@")[0] ?? "Người dùng";
   const avatarLetter = displayName.charAt(0).toUpperCase();
 
-  function handlePress(item: any) {
+  async function handlePress(item: any) {
     if (item.route) {
       router.push(item.route);
+    } else if (item.action === "logout") {
+      Alert.alert("Đăng xuất", "Bạn có chắc muốn đăng xuất?", [
+        { text: "Huỷ", style: "cancel" },
+        {
+          text: "Đăng xuất",
+          style: "destructive",
+          onPress: async () => {
+            await signOut();
+            router.replace("/auth/login");
+          },
+        },
+      ]);
+    } else {
+      Alert.alert("Sắp ra mắt", "Tính năng này đang được phát triển.");
     }
   }
 
@@ -108,28 +114,33 @@ export default function ProfileScreen() {
       </View>
 
       {/* Menu sections */}
-      <View style={styles.menuWrapper}>
-        {SECTIONS.map((section) => (
-          <View key={section.key} style={styles.section}>
-            {section.title && (
-              <Text style={styles.sectionTitle}>{section.title}</Text>
-            )}
-            {section.items.map((item, i) => (
-              <TouchableOpacity
-                key={i}
-                style={styles.menuItem}
-                onPress={() => handlePress(item)}
-              >
-                <View style={styles.menuIconWrap}>
-                  <Icon type={item.icon} />
-                </View>
-                <Text style={styles.menuLabel}>{item.label}</Text>
-                <Text style={styles.arrow}>›</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        ))}
-      </View>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <View style={styles.menuWrapper}>
+          {SECTIONS.map((section) => (
+            <View key={section.key} style={styles.section}>
+              {section.title ? (
+                <Text style={styles.sectionTitle}>{section.title}</Text>
+              ) : null}
+              {section.items.map((item, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[styles.menuItem, item.action === "logout" && styles.menuItemLogout]}
+                  onPress={() => handlePress(item)}
+                >
+                  <View style={styles.menuIconWrap}>
+                    <Icon type={item.icon} />
+                  </View>
+                  <Text style={[styles.menuLabel, item.action === "logout" && styles.menuLabelLogout]}>
+                    {item.label}
+                  </Text>
+                  {item.action !== "logout" && <Text style={styles.arrow}>›</Text>}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
+        </View>
+        <View style={{ height: 32 }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -193,4 +204,6 @@ const styles = StyleSheet.create({
   iconEmoji: { fontSize: 20 },
   menuLabel: { flex: 1, color: "#ffffff", fontSize: 16 },
   arrow: { color: "#444", fontSize: 22 },
+  menuItemLogout: { borderTopWidth: 1, borderTopColor: "#1a1a1a", marginTop: 8 },
+  menuLabelLogout: { color: "#e74c3c" },
 });

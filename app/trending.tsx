@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 
+const PINK = "#e91e8c";
 const COVER_SIZE = 90;
 
 const TIME_TABS = ["Ngày", "Tuần", "Tháng"];
@@ -154,7 +155,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  backIcon: { color: "#4a9eff", fontSize: 22, fontWeight: "bold" },
+  backIcon: { color: PINK, fontSize: 22, fontWeight: "bold" },
   headerTitle: { color: "#ffffff", fontSize: 17, fontWeight: "bold" },
 
   // Tabs căn giữa
@@ -179,7 +180,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: "#4a9eff",
+    backgroundColor: PINK,
     borderRadius: 2,
   },
 
@@ -200,7 +201,7 @@ const styles = StyleSheet.create({
   },
   rankInfo: { flex: 1 },
   rankTitle: {
-    color: "#4a9eff",
+    color: PINK,
     fontSize: 15,
     fontWeight: "600",
     lineHeight: 22,

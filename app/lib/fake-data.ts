@@ -229,14 +229,18 @@ export function makeFakeChapters(bookId: string, count = 33): Chapter[] {
 
 // ── MY LIBRARY ───────────────────────────────────────────────
 
-export const FAKE_MY_BOOKS = FAKE_BOOKS.slice(0, 5).map((b, i) => ({
+export const FAKE_MY_BOOKS: UserLibraryItem[] = FAKE_BOOKS.slice(0, 5).map((b, i) => ({
 	id: `lib-${b.id}`,
+	user_id: "fake-user",
 	title: b.title,
+	author_id: null,
 	author: b.author,
 	tag: b.tag,
 	source: "download" as const,
+	file_path: null,
+	created_at: new Date().toISOString(),
 	book_id: b.id,
-	cover_url: b.cover_url ?? undefined,
+	cover_url: b.cover_url ?? null,
 	current_chapter: i + 1,
 	total_chapters: b.total_chapters,
 }));

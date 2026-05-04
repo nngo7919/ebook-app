@@ -45,6 +45,10 @@ export default function BookListScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) {
+      router.replace("/auth/login");
+      return;
+    }
     fetchBooks();
   }, [type, user]);
 
@@ -81,8 +85,8 @@ export default function BookListScreen() {
     } else {
       const { data } = user
         ? await libApi.list(user.id, {
-            source: type === "download" ? "download" : undefined,
-          })
+          source: type === "download" ? "download" : undefined,
+        })
         : { data: null };
       books = (data ?? []).map((item) => ({
         id: item.id,
@@ -100,6 +104,8 @@ export default function BookListScreen() {
     if (books.length === 0) {
       books = FAKE_MY_BOOKS.map((b) => ({
         ...b,
+        book_id: b.book_id ?? b.id,
+        cover_url: b.cover_url ?? undefined,
         total_chapters: undefined,
       }));
     }

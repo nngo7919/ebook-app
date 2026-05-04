@@ -5,6 +5,7 @@ import {
 } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
 import { FAKE_LIBRARY_ITEMS, FAKE_MY_BOOKS } from "@/app/lib/fake-data";
+import type { UserLibraryItem } from "@/app/lib/types";
 import * as DocumentPicker from "expo-document-picker";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -25,22 +26,12 @@ const { width } = Dimensions.get("window");
 const CARD_WIDTH = 140;
 const CARD_HEIGHT = CARD_WIDTH * 1.4;
 
-type MyBook = {
-  id: string;
-  title: string;
-  author: string;
-  tag: string;
-  source: "download" | "upload";
-  book_id: string;
-  cover_url?: string;
-};
-
 export default function MyLibraryScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const [recentBooks, setRecentBooks] = useState<MyBook[]>([]);
-  const [favoriteBooks, setFavoriteBooks] = useState<MyBook[]>([]);
-  const [downloadedBooks, setDownloadedBooks] = useState<MyBook[]>([]);
+  const [recentBooks, setRecentBooks] = useState<UserLibraryItem[]>([]);
+  const [favoriteBooks, setFavoriteBooks] = useState<UserLibraryItem[]>([]);
+  const [downloadedBooks, setDownloadedBooks] = useState<UserLibraryItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -53,12 +44,16 @@ export default function MyLibraryScreen() {
       : { data: null };
     const recentMapped = (recentResult.data ?? []).map((r) => ({
       id: r.book_id,
+      user_id: user?.id ?? "",
       title: r.book.title,
+      author_id: null,
       author: r.book.author,
       tag: r.book.tag,
       source: "download" as const,
+      file_path: null,
+      created_at: new Date().toISOString(),
       book_id: r.book_id,
-      cover_url: r.book.cover_url ?? undefined,
+      cover_url: r.book.cover_url ?? null,
     }));
     setRecentBooks(recentMapped.length > 0 ? recentMapped : FAKE_MY_BOOKS);
 
@@ -66,12 +61,16 @@ export default function MyLibraryScreen() {
     const favResult = user ? await favApi.list(user.id) : { data: null };
     const favMapped = (favResult.data ?? []).slice(0, 6).map((b) => ({
       id: b.id,
+      user_id: user?.id ?? "",
       title: b.title,
+      author_id: null,
       author: b.author,
       tag: b.tag,
       source: "download" as const,
+      file_path: null,
+      created_at: new Date().toISOString(),
       book_id: b.id,
-      cover_url: b.cover_url ?? undefined,
+      cover_url: b.cover_url ?? null,
     }));
     setFavoriteBooks(
       favMapped.length > 0 ? favMapped : FAKE_MY_BOOKS.slice(0, 3),
@@ -83,25 +82,21 @@ export default function MyLibraryScreen() {
       : { data: null };
     const dlMapped = (dlResult.data ?? []).slice(0, 6).map((item) => ({
       id: item.id,
+      user_id: user?.id ?? "",
       title: item.title,
+      author_id: null,
       author: item.author,
       tag: item.tag,
       source: item.source,
+      file_path: null,
+      created_at: new Date().toISOString(),
       book_id: item.book_id ?? item.id,
-      cover_url: item.cover_url ?? undefined,
+      cover_url: item.cover_url ?? null,
     }));
     setDownloadedBooks(
       dlMapped.length > 0
         ? dlMapped
-        : FAKE_LIBRARY_ITEMS.map((item) => ({
-            id: item.id,
-            title: item.title,
-            author: item.author,
-            tag: item.tag,
-            source: item.source,
-            book_id: item.book_id ?? item.id,
-            cover_url: item.cover_url ?? undefined,
-          })),
+        : FAKE_LIBRARY_ITEMS,
     );
 
     setLoading(false);
@@ -160,7 +155,7 @@ export default function MyLibraryScreen() {
     }
   }
 
-  function BookCard({ item }: { item: MyBook }) {
+  function BookCard({ item }: { item: UserLibraryItem }) {
     return (
       <TouchableOpacity
         style={styles.card}

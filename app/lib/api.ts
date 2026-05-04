@@ -321,23 +321,40 @@ export const books = {
     return hydrateBooks(data ?? [])
   },
 
-  /** Lấy books theo genre */
-  async byGenre(genre: string): Promise<ApiResult<Book[]>> {
-    const { data, error } = await supabase
+  /** Lấy books theo genre (có phân trang) */
+  async byGenre(genre: string, opts?: {
+    limit?: number
+    offset?: number
+    orderBy?: 'created_at' | 'likes' | 'rating_avg'
+  }): Promise<ApiResult<Book[]>> {
+    const limit = opts?.limit ?? 30
+    const offset = opts?.offset ?? 0
+
+    // Sort theo views dùng listBooksByViews để tránh lấy hết rồi slice
+    if (!opts?.orderBy || opts.orderBy === 'created_at') {
+      let q = supabase
+        .from('books')
+        .select('*, authors(*)')
+        .ilike('genres', `%${genre}%`)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+
+      const { data, error } = await q
+      if (error) return err(supaErr(error))
+      return hydrateBooks(data ?? [])
+    }
+
+    // Sort theo likes hoặc rating_avg — DB sort trực tiếp
+    let q = supabase
       .from('books')
       .select('*, authors(*)')
       .ilike('genres', `%${genre}%`)
-      .limit(50)
+      .order(opts.orderBy, { ascending: false })
+      .range(offset, offset + limit - 1)
 
+    const { data, error } = await q
     if (error) return err(supaErr(error))
-    const hydrated = await hydrateBooks(data ?? [])
-    if (hydrated.error) return err(hydrated.error)
-
-    return ok(
-      [...(hydrated.data ?? [])]
-        .sort((a, b) => (b.views ?? 0) - (a.views ?? 0))
-        .slice(0, 20),
-    )
+    return hydrateBooks(data ?? [])
   },
 
   /** Tăng view count (cần Supabase RPC function) */
@@ -580,18 +597,25 @@ export const library = {
     item: {
       book_id?: string
       title: string
-      author_id?: string
-      author?: string
+      author: string    // text, match schema user_library.author
       tag: string
       cover_url?: string
       source: 'download' | 'upload'
       file_path?: string
     },
   ): Promise<ApiResult<true>> {
-    const { author: _author, ...payload } = item
     const { error } = await supabase
       .from('user_library')
-      .insert({ user_id: userId, ...payload })
+      .insert({
+        user_id: userId,
+        book_id: item.book_id ?? null,
+        title: item.title,
+        author: item.author,
+        tag: item.tag,
+        cover_url: item.cover_url ?? null,
+        source: item.source,
+        file_path: item.file_path ?? null,
+      })
 
     if (error) return err(supaErr(error))
     return ok(true as const)
@@ -910,6 +934,7 @@ export const follows = {
       .from('follows')
       .select('author_id, authors(*)')
       .eq('user_id', userId)
+      .not('author_id', 'is', null)
       .order('created_at', { ascending: false })
 
     if (opts?.limit) q = q.limit(opts.limit)
@@ -922,6 +947,68 @@ export const follows = {
       (data ?? [])
         .map((f: any) => ({ ...f.authors, is_followed: true }))
         .filter(Boolean),
+    )
+  },
+
+  /** Kiểm tra user đã follow book chưa */
+  async checkBook(userId: string, bookId: string): Promise<ApiResult<boolean>> {
+    const { data } = await supabase
+      .from('follows')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('book_id', bookId)
+      .maybeSingle()
+    return ok(!!data)
+  },
+
+  /** Toggle follow book — trả về trạng thái mới */
+  async toggleBook(userId: string, bookId: string): Promise<ApiResult<boolean>> {
+    const { data: existing } = await supabase
+      .from('follows')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('book_id', bookId)
+      .maybeSingle()
+
+    if (existing) {
+      const { error } = await supabase
+        .from('follows')
+        .delete()
+        .eq('user_id', userId)
+        .eq('book_id', bookId)
+      if (error) return err(supaErr(error))
+      return ok(false)
+    } else {
+      const { error } = await supabase
+        .from('follows')
+        .insert({ user_id: userId, book_id: bookId, author_id: null })
+      if (error) return err(supaErr(error))
+      return ok(true)
+    }
+  },
+
+  /** Lấy danh sách books mà user đang follow */
+  async getFollowingBooks(userId: string, opts?: {
+    limit?: number
+    offset?: number
+  }): Promise<ApiResult<Book[]>> {
+    let q = supabase
+      .from('follows')
+      .select('book_id, books(*, authors(*))')
+      .eq('user_id', userId)
+      .not('book_id', 'is', null)
+      .order('created_at', { ascending: false })
+
+    if (opts?.limit) q = q.limit(opts.limit)
+    if (opts?.offset != null && opts?.limit != null)
+      q = q.range(opts.offset, opts.offset + opts.limit - 1)
+
+    const { data, error } = await q
+    if (error) return err(supaErr(error))
+    return ok(
+      (data ?? [])
+        .map((f: any) => f.books ? parseBook(f.books) : null)
+        .filter(Boolean) as Book[],
     )
   },
 }
@@ -1001,7 +1088,7 @@ export const ratings = {
   async list(bookId: string, opts?: {
     limit?: number
     offset?: number
-    orderBy?: 'created_at' | 'likes'
+    orderBy?: 'created_at' | 'rating'  // 'likes' không tồn tại trên ratings
   }): Promise<ApiResult<Rating[]>> {
     let q = supabase
       .from('ratings')
@@ -1173,49 +1260,52 @@ export const comments = {
     return ok(true as const)
   },
 
-  /** Lấy danh sách comments của book (top-level only) */
+  /** Lấy danh sách comments của book (top-level + replies trong 1 query) */
   async list(bookId: string, opts?: {
     limit?: number
     offset?: number
     orderBy?: 'created_at' | 'likes'
   }): Promise<ApiResult<any[]>> {
+    // 1 query lấy tất cả comments + replies của book, tránh N+1
     let q = supabase
       .from('comments')
       .select('*, profiles(id, username, avatar_url)')
       .eq('book_id', bookId)
-      .is('parent_id', null)  // Top-level only
       .eq('is_deleted', false)
-      .order(opts?.orderBy ?? 'created_at', { ascending: false })
+      .order('created_at', { ascending: true })
 
     if (opts?.limit) q = q.limit(opts.limit)
-    if (opts?.offset != null && opts?.limit != null)
-      q = q.range(opts.offset, opts.offset + opts.limit - 1)
 
     const { data, error } = await q
     if (error) return err(supaErr(error))
 
-    // Lấy replies cho mỗi comment
-    const withReplies = await Promise.all(
-      (data ?? []).map(async (comment: any) => {
-        const { data: replies } = await supabase
-          .from('comments')
-          .select('*, profiles(id, username, avatar_url)')
-          .eq('parent_id', comment.id)
-          .eq('is_deleted', false)
-          .order('created_at', { ascending: true })
+    const all = (data ?? []).map((c: any) => ({ ...c, user: c.profiles, replies: [] as any[] }))
 
-        return {
-          ...comment,
-          user: comment.profiles,
-          replies: (replies ?? []).map((r: any) => ({
-            ...r,
-            user: r.profiles,
-          })),
-        }
-      }),
-    )
+    // Tách top-level và replies, group replies vào parent
+    const topLevel: any[] = []
+    const replyMap: Record<string, any[]> = {}
 
-    return ok(withReplies)
+    for (const c of all) {
+      if (c.parent_id) {
+        if (!replyMap[c.parent_id]) replyMap[c.parent_id] = []
+        replyMap[c.parent_id].push(c)
+      } else {
+        topLevel.push(c)
+      }
+    }
+
+    // Gắn replies vào đúng parent
+    const result = topLevel
+      .map((c) => ({ ...c, replies: replyMap[c.id] ?? [] }))
+      .sort((a, b) => {
+        if (opts?.orderBy === 'likes') return (b.likes ?? 0) - (a.likes ?? 0)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+
+    const offset = opts?.offset ?? 0
+    const limited = opts?.limit != null ? result.slice(offset, offset + opts.limit) : result.slice(offset)
+
+    return ok(limited)
   },
 
   /** Lấy nested replies của 1 comment */
