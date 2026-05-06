@@ -32,18 +32,30 @@ export default function SignupScreen() {
 
   async function handleSignup() {
     if (!username.trim() || !email.trim() || !password) {
-      Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ các trường.");
+      if (Platform.OS === "web") {
+        window.alert("Thiếu thông tin\nVui lòng điền đầy đủ các trường.");
+      } else {
+        Alert.alert("Thiếu thông tin", "Vui lòng điền đầy đủ các trường.");
+      }
       return;
     }
     if (password !== confirm) {
-      Alert.alert(
-        "Mật khẩu không khớp",
-        "Vui lòng kiểm tra lại mật khẩu xác nhận.",
-      );
+      if (Platform.OS === "web") {
+        window.alert("Mật khẩu không khớp\nVui lòng kiểm tra lại mật khẩu xác nhận.");
+      } else {
+        Alert.alert(
+          "Mật khẩu không khớp",
+          "Vui lòng kiểm tra lại mật khẩu xác nhận.",
+        );
+      }
       return;
     }
     if (password.length < 6) {
-      Alert.alert("Mật khẩu quá ngắn", "Mật khẩu phải có ít nhất 6 ký tự.");
+      if (Platform.OS === "web") {
+        window.alert("Mật khẩu quá ngắn\nMật khẩu phải có ít nhất 6 ký tự.");
+      } else {
+        Alert.alert("Mật khẩu quá ngắn", "Mật khẩu phải có ít nhất 6 ký tự.");
+      }
       return;
     }
 
@@ -56,26 +68,40 @@ export default function SignupScreen() {
     setLoading(false);
 
     if (error) {
-      Alert.alert("Đăng ký thất bại", error);
+      if (Platform.OS === "web") {
+        window.alert(`Đăng ký thất bại\n${error}`);
+      } else {
+        Alert.alert("Đăng ký thất bại", error);
+      }
       return;
     }
 
     if (requiresConfirmation) {
       // Confirm email = ON → session chưa tạo, chỉ cần báo user kiểm tra email
-      Alert.alert(
-        "Kiểm tra email của bạn 📬",
-        `Chúng tôi đã gửi link xác nhận đến ${email.trim()}. Sau khi xác nhận hãy đăng nhập.`,
-        [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login") }],
-      );
+      if (Platform.OS === "web") {
+        window.alert(`Kiểm tra email của bạn 📬\nChúng tôi đã gửi link xác nhận đến ${email.trim()}. Sau khi xác nhận hãy đăng nhập.`);
+        router.replace("/auth/login");
+      } else {
+        Alert.alert(
+          "Kiểm tra email của bạn 📬",
+          `Chúng tôi đã gửi link xác nhận đến ${email.trim()}. Sau khi xác nhận hãy đăng nhập.`,
+          [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login") }],
+        );
+      }
     } else {
       // Confirm email = OFF → Supabase tạo session luôn, cần sign out
       // trước khi alert để tránh AuthProvider tự redirect sang tabs
       await signOut();
-      Alert.alert(
-        "Đăng ký thành công! 🎉",
-        "Tài khoản đã được tạo. Bạn có thể đăng nhập ngay bây giờ.",
-        [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login") }],
-      );
+      if (Platform.OS === "web") {
+        window.alert("Đăng ký thành công! 🎉\nTài khoản đã được tạo. Bạn có thể đăng nhập ngay bây giờ.");
+        router.replace("/auth/login");
+      } else {
+        Alert.alert(
+          "Đăng ký thành công! 🎉",
+          "Tài khoản đã được tạo. Bạn có thể đăng nhập ngay bây giờ.",
+          [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login") }],
+        );
+      }
     }
   }
 

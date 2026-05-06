@@ -194,7 +194,7 @@ export const auth = {
   /** Gửi email đặt lại mật khẩu */
   async resetPassword(email: string): Promise<ApiResult<true>> {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'tytebook://reset-password',
+      redirectTo: 'ebook-app://auth/reset-password',
     })
     if (error) return err(supaErr(error))
     return ok(true as const)
