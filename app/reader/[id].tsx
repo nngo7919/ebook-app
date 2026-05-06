@@ -52,10 +52,13 @@ export default function ReaderScreen() {
     DEFAULT_READER_SETTINGS,
   );
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [autoScrolling, setAutoScrolling] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
   const contentHeight = useRef(0);
   const scrollHeight = useRef(0);
+  const scrollY = useRef(0);
+  const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load settings
   useEffect(() => {
@@ -79,7 +82,20 @@ export default function ReaderScreen() {
     if (data) {
       setBookTitle(data.title);
       setTotalChapters(data.total_chapters ?? 1);
+    } else {
+      // Fallback fake data
+      const { FAKE_BOOKS } = await import("@/app/lib/fake-data");
+      const fake = FAKE_BOOKS.find((b) => b.id === id);
+      if (fake) {
+        setBookTitle(fake.title);
+        setTotalChapters(fake.total_chapters ?? 17);
+      }
     }
+    // Tăng view khi người dùng vào đọc
+    void booksApi.incrementViews(id, {
+      userId: isGuest ? null : (user?.id ?? null),
+      guestId: isGuest ? (user?.id ?? null) : null,
+    });
   }
 
   async function loadChapter(num: number) {
@@ -113,6 +129,7 @@ export default function ReaderScreen() {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
     contentHeight.current = contentSize.height;
     scrollHeight.current = layoutMeasurement.height;
+    scrollY.current = contentOffset.y;
     const progress =
       contentOffset.y / (contentSize.height - layoutMeasurement.height);
     const clamped = Math.min(1, Math.max(0, progress));
@@ -126,6 +143,41 @@ export default function ReaderScreen() {
 
   const toggleControls = useCallback(() => {
     setShowControls((v) => !v);
+  }, []);
+
+  function toggleAutoScroll() {
+    if (autoScrolling) {
+      if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+      autoScrollTimer.current = null;
+      setAutoScrolling(false);
+    } else {
+      setAutoScrolling(true);
+      autoScrollTimer.current = setInterval(() => {
+        const maxY = contentHeight.current - scrollHeight.current;
+        if (scrollY.current >= maxY - 2) {
+          if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+          autoScrollTimer.current = null;
+          setAutoScrolling(false);
+          return;
+        }
+        const nextY = Math.min(scrollY.current + (settings.scrollSpeed * 0.4), maxY);
+        scrollRef.current?.scrollTo({ y: nextY, animated: true });
+      }, 80);
+    }
+  }
+
+  // Dừng auto scroll khi đổi chương
+  useEffect(() => {
+    if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+    autoScrollTimer.current = null;
+    setAutoScrolling(false);
+  }, [currentChapter]);
+
+  // Cleanup khi unmount
+  useEffect(() => {
+    return () => {
+      if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+    };
   }, []);
 
   const shortTitle =
@@ -267,8 +319,8 @@ export default function ReaderScreen() {
               <Text style={styles.ctrlIcon}>⚙</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.ctrlBtn}>
-              <Text style={styles.ctrlIcon}>▶</Text>
+            <TouchableOpacity style={styles.ctrlBtn} onPress={toggleAutoScroll}>
+              <Text style={[styles.ctrlIcon, autoScrolling && { color: "#fff" }]}>▶</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.ctrlBtn}>

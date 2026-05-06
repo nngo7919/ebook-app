@@ -41,6 +41,7 @@ export default function MyLibraryScreen() {
   const [recentBooks, setRecentBooks] = useState<MyBook[]>([]);
   const [favoriteBooks, setFavoriteBooks] = useState<MyBook[]>([]);
   const [downloadedBooks, setDownloadedBooks] = useState<MyBook[]>([]);
+  const [ebookBooks, setEbookBooks] = useState<MyBook[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -115,6 +116,21 @@ export default function MyLibraryScreen() {
           cover_url: item.cover_url ?? undefined,
         })),
     );
+
+    // Ebook (upload từ file)
+    const ebookResult = isLoggedInUser
+      ? await libApi.list(user.id, { source: "upload" })
+      : { data: null };
+    const ebookMapped = (ebookResult.data ?? []).slice(0, 6).map((item) => ({
+      id: item.id,
+      title: item.title,
+      author: item.author,
+      tag: item.tag,
+      source: item.source,
+      book_id: item.book_id ?? item.id,
+      cover_url: item.cover_url ?? undefined,
+    }));
+    setEbookBooks(ebookMapped);
 
     setLoading(false);
   }
@@ -331,6 +347,33 @@ export default function MyLibraryScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             keyExtractor={(item) => item.id + "dl"}
+            contentContainerStyle={styles.horizontalList}
+            renderItem={({ item }) => <BookCard item={item} />}
+          />
+        )}
+
+        <View style={styles.divider} />
+
+        {/* Ebook — Truyện tải lên từ file epub/pdf */}
+        <SectionHeader
+          title="Ebook · Tải Lên"
+          onPress={() =>
+            router.push({
+              pathname: "/book-list",
+              params: { type: "upload", title: "Ebook · Tải Lên" },
+            })
+          }
+        />
+        {ebookBooks.length === 0 ? (
+          <View style={styles.emptySection}>
+            <Text style={styles.emptyText}>Chưa có ebook nào. Bấm 📤 để tải file epub/pdf.</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={ebookBooks}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id + "ebook"}
             contentContainerStyle={styles.horizontalList}
             renderItem={({ item }) => <BookCard item={item} />}
           />

@@ -2,7 +2,7 @@ import { books as booksApi } from "@/app/lib/api";
 import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FlatList,
   Image,
@@ -58,14 +58,34 @@ export default function SearchScreen() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("tag");
   const [query, setQuery] = useState("");
+  const [allResults, setAllResults] = useState<Book[]>([]);
   const [results, setResults] = useState<Book[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sortBy, setSortBy] = useState<"created_at" | "views" | "likes" | "rating_avg">("created_at");
+  const [showSort, setShowSort] = useState(false);
+
+  const SORT_OPTIONS = [
+    { key: "created_at" as const, label: "Mới nhất" },
+    { key: "views" as const, label: "Lượt xem" },
+    { key: "likes" as const, label: "Yêu thích" },
+    { key: "rating_avg" as const, label: "Đánh giá" },
+  ];
+
+  useEffect(() => {
+    const sorted = [...allResults].sort((a, b) => {
+      if (sortBy === "views") return (b.views ?? 0) - (a.views ?? 0);
+      if (sortBy === "likes") return (b.likes ?? 0) - (a.likes ?? 0);
+      if (sortBy === "rating_avg") return (b.rating_avg ?? 0) - (a.rating_avg ?? 0);
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    setResults(sorted);
+  }, [sortBy, allResults]);
 
   async function handleSearch(text: string) {
     setQuery(text);
     if (text.trim().length < 2) {
-      setResults([]);
+      setAllResults([]);
       setSearched(false);
       return;
     }
@@ -73,9 +93,8 @@ export default function SearchScreen() {
     setSearched(true);
     const { data } = await booksApi.search(text.trim());
     if (data && data.length > 0) {
-      setResults(data);
+      setAllResults(data);
     } else {
-      // Fake: lọc trong FAKE_BOOKS theo tên/tác giả
       const q = text.trim().toLowerCase();
       const fakeResults = FAKE_BOOKS.filter(
         (b) =>
@@ -83,7 +102,7 @@ export default function SearchScreen() {
           b.author.toLowerCase().includes(q) ||
           (b.genres ?? "").toLowerCase().includes(q),
       );
-      setResults(fakeResults.length > 0 ? fakeResults : FAKE_BOOKS);
+      setAllResults(fakeResults.length > 0 ? fakeResults : FAKE_BOOKS);
     }
     setLoading(false);
   }
@@ -199,13 +218,30 @@ export default function SearchScreen() {
     }
 
     return (
-      <FlatList
-        data={results}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 80 }}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => <ResultItem item={item} />}
-      />
+      <>
+        {/* Sort bar */}
+        <View style={styles.sortBar}>
+          <Text style={styles.sortBarLabel}>Sắp xếp:</Text>
+          {SORT_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
+              style={[styles.sortChip, sortBy === opt.key && styles.sortChipActive]}
+              onPress={() => setSortBy(opt.key)}
+            >
+              <Text style={[styles.sortChipText, sortBy === opt.key && styles.sortChipTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <FlatList
+          data={results}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: 80 }}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          renderItem={({ item }) => <ResultItem item={item} />}
+        />
+      </>
     );
   }
 
@@ -435,4 +471,28 @@ const styles = StyleSheet.create({
   subTabActive: { color: PINK },
   subTabLabel: { fontSize: 11, color: "#555", fontWeight: "500" },
   subTabLabelActive: { color: PINK },
+
+  // Sort bar
+  sortBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+    flexWrap: "wrap",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#1a1a1a",
+  },
+  sortBarLabel: { color: "#666", fontSize: 12 },
+  sortChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: "#1e1e1e",
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+  },
+  sortChipActive: { backgroundColor: PINK, borderColor: PINK },
+  sortChipText: { color: "#aaa", fontSize: 12 },
+  sortChipTextActive: { color: "#fff", fontWeight: "700" },
 });

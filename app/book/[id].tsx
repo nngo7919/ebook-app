@@ -1,4 +1,4 @@
-import { books as booksApi, favorites as favApi } from "@/app/lib/api";
+import { books as booksApi, favorites as favApi, progress as progressApi } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
 import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
@@ -32,6 +32,7 @@ export default function BookDetailScreen() {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
+  const [lastChapter, setLastChapter] = useState<number | null>(null);
 
   useEffect(() => {
     fetchBook();
@@ -41,6 +42,15 @@ export default function BookDetailScreen() {
   useEffect(() => {
     if (user && !isGuest && id) {
       favApi.check(user.id, id).then(({ data }) => setLiked(!!data));
+    }
+  }, [user, isGuest, id]);
+
+  // Load reading progress để biết đọc tiếp chương nào
+  useEffect(() => {
+    if (user && !isGuest && id) {
+      progressApi.get(user.id, id).then(({ data }) => {
+        if (data?.chapter_number) setLastChapter(data.chapter_number);
+      });
     }
   }, [user, isGuest, id]);
 
@@ -303,13 +313,40 @@ export default function BookDetailScreen() {
         {book.editor && (
           <Text style={styles.editorText}>Editor: {book.editor}</Text>
         )}
+
+        {/* Description */}
+        {book.description ? (
+          <View style={styles.descSection}>
+            <Text style={styles.descLabel}>Giới Thiệu</Text>
+            <Text style={styles.descText}>{book.description}</Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Bottom bar */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.bottomDownload}
-          onPress={() => Alert.alert("Tải về", "Chức năng đang phát triển")}
+          onPress={async () => {
+            if (!user || isGuest) {
+              Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để tải truyện.", [
+                { text: "Để sau", style: "cancel" },
+                { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+              ]);
+              return;
+            }
+            const { library: libApi } = await import("@/app/lib/api");
+            const { data: err } = await libApi.add(user.id, {
+              book_id: book.id,
+              title: book.title,
+              author: book.author ?? "Không rõ",
+              tag: book.tag,
+              cover_url: book.cover_url ?? undefined,
+              source: "download",
+            });
+            if (err === true) Alert.alert("✅ Đã lưu", `"${book.title}" đã thêm vào Tải Gần Đây.`);
+            else Alert.alert("Thông báo", "Đã lưu vào thư viện!");
+          }}
         >
           <Text style={styles.bottomDownloadIcon}>⬇</Text>
           <Text style={styles.bottomDownloadText}>Tải Về</Text>
@@ -317,11 +354,14 @@ export default function BookDetailScreen() {
 
         <TouchableOpacity
           style={styles.bottomRead}
-          onPress={() =>
-            router.push({ pathname: "/reader/[id]", params: { id: book.id } })
-          }
+          onPress={() => {
+            const chapterToOpen = lastChapter ?? 1;
+            router.push({ pathname: "/reader/[id]", params: { id: book.id, chapter: chapterToOpen } });
+          }}
         >
-          <Text style={styles.bottomReadText}>Đọc Truyện</Text>
+          <Text style={styles.bottomReadText}>
+            {lastChapter ? `Đọc Tiếp · Chương ${lastChapter}` : "Đọc Truyện"}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -528,4 +568,21 @@ const styles = StyleSheet.create({
   bottomToc: { alignItems: "center", width: 48 },
   bottomTocIcon: { color: PINK, fontSize: 20 },
   bottomTocText: { color: PINK, fontSize: 11, marginTop: 2 },
+
+  // Description
+  descSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  descLabel: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
+  descText: {
+    color: "#aaa",
+    fontSize: 14,
+    lineHeight: 22,
+  },
 });
