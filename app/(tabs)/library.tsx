@@ -112,7 +112,7 @@ export default function LibraryScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>TYT</Text>
-        <TouchableOpacity style={styles.filterIconBtn}>
+        <TouchableOpacity style={styles.filterIconBtn} onPress={() => router.push("/reader-settings" as any)}>
           <Text style={styles.filterIconText}>⚙️</Text>
         </TouchableOpacity>
       </View>

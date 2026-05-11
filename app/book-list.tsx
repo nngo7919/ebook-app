@@ -135,7 +135,19 @@ export default function BookListScreen() {
           text: "Xoá",
           style: "destructive",
           onPress: async () => {
-            // TODO: xoá theo type trong DB
+            if (!user) return;
+            if (type === "favorite") {
+              // Xoá tất cả favorites — toggle từng cái
+              for (const b of allBooks) {
+                await favApi.toggle(user.id, b.book_id || b.id);
+              }
+            } else if (type === "download" || type === "upload" || !type) {
+              // Xoá từng item trong library
+              for (const b of allBooks) {
+                await libApi.remove(user.id, b.id);
+              }
+            }
+            // recent (reading_progress) — không xoá, chỉ clear UI
             setAllBooks([]);
             setFiltered([]);
           },
@@ -145,9 +157,9 @@ export default function BookListScreen() {
   }
 
   function BookItem({ item }: { item: MyBook }) {
-    const chapters =
-      item.total_chapters ?? Math.floor(Math.random() * 1500 + 100);
+    const chapters = item.total_chapters ?? 0;
     const currentChapter = item.current_chapter ?? 1;
+    const isFull = (item as any).is_full ?? false;
 
     return (
       <TouchableOpacity
@@ -164,8 +176,13 @@ export default function BookListScreen() {
             {item.title}
           </Text>
           <View style={{ height: 8 }} />
-          <Text style={styles.itemMeta}>{chapters} chương　【FULL】</Text>
-          <Text style={styles.itemCurrent}>Đang xem: {currentChapter}</Text>
+          <Text style={styles.itemMeta}>
+            {chapters > 0 ? `${chapters} chương` : "Chưa có chương"}
+            {isFull ? "　【FULL】" : "　【Đang ra】"}
+          </Text>
+          {type === "recent" && (
+            <Text style={styles.itemCurrent}>Đang xem: Chương {currentChapter}</Text>
+          )}
         </View>
 
         {/* Cover */}
@@ -179,8 +196,8 @@ export default function BookListScreen() {
               </Text>
             </View>
           )}
-          <View style={styles.fullBadge}>
-            <Text style={styles.fullBadgeText}>FULL</Text>
+          <View style={[styles.fullBadge, !isFull && { backgroundColor: "#e67e22" }]}>
+            <Text style={styles.fullBadgeText}>{isFull ? "FULL" : "ĐANG RA"}</Text>
           </View>
         </View>
       </TouchableOpacity>

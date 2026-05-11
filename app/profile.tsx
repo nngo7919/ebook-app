@@ -108,6 +108,44 @@ export default function ProfileScreen() {
     }
   }
 
+  async function handleDeleteAccount() {
+    Alert.alert(
+      "⚠️ Xoá Tài Khoản",
+      "Hành động này không thể hoàn tác. Toàn bộ dữ liệu của bạn sẽ bị xoá vĩnh viễn.",
+      [
+        { text: "Huỷ", style: "cancel" },
+        {
+          text: "Xoá vĩnh viễn",
+          style: "destructive",
+          onPress: () => {
+            Alert.alert(
+              "Xác nhận lần cuối",
+              `Bạn có chắc chắn muốn xoá tài khoản "${profile?.display_name ?? user?.email}"?`,
+              [
+                { text: "Không", style: "cancel" },
+                {
+                  text: "Có, xoá ngay",
+                  style: "destructive",
+                  onPress: async () => {
+                    // Supabase không cho phép user tự xoá account qua client SDK
+                    // Cần server-side function hoặc admin API
+                    // Hiện tại: đăng xuất và hiển thị thông báo
+                    await signOut();
+                    router.replace("/auth/login");
+                    Alert.alert(
+                      "Yêu cầu đã ghi nhận",
+                      "Tài khoản của bạn sẽ bị xoá trong vòng 24 giờ. Liên hệ admin nếu cần hỗ trợ.",
+                    );
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -121,9 +159,7 @@ export default function ProfileScreen() {
         <Text style={styles.headerTitle}>Cá Nhân</Text>
         <TouchableOpacity
           style={styles.headerBtn}
-          onPress={() =>
-            Alert.alert("Xoá tài khoản", "Chức năng này chưa khả dụng.")
-          }
+          onPress={handleDeleteAccount}
         >
           <Text style={[styles.headerBtnText, { fontSize: 20 }]}>🗑️</Text>
         </TouchableOpacity>

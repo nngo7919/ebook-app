@@ -1,6 +1,7 @@
 import {
   books as booksApi,
   chapters as chaptersApi,
+  comments as commentsApi,
   progress as progressApi,
 } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
@@ -13,11 +14,17 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Dimensions,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
@@ -53,6 +60,10 @@ export default function ReaderScreen() {
   );
   const [scrollProgress, setScrollProgress] = useState(0);
   const [autoScrolling, setAutoScrolling] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentList, setCommentList] = useState<any[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [sendingComment, setSendingComment] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
   const contentHeight = useRef(0);
@@ -179,6 +190,33 @@ export default function ReaderScreen() {
       if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
     };
   }, []);
+
+  async function openComments() {
+    setShowComments(true);
+    const { data } = await commentsApi.list(id, { limit: 50 });
+    setCommentList(data ?? []);
+  }
+
+  async function handleSendComment() {
+    if (!user || isGuest) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để bình luận.", [
+        { text: "Để sau", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+      ]);
+      return;
+    }
+    const text = commentText.trim();
+    if (!text) return;
+    setSendingComment(true);
+    const { data, error } = await commentsApi.post(user.id, id, text);
+    setSendingComment(false);
+    if (error) {
+      Alert.alert("Lỗi", error);
+    } else {
+      setCommentText("");
+      setCommentList((prev) => [data, ...prev]);
+    }
+  }
 
   const shortTitle =
     bookTitle.length > 16 ? bookTitle.slice(0, 16) + "..." : bookTitle;
@@ -323,8 +361,8 @@ export default function ReaderScreen() {
               <Text style={[styles.ctrlIcon, autoScrolling && { color: "#fff" }]}>▶</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.ctrlBtn}>
-              <Text style={styles.ctrlIcon}>🎧</Text>
+            <TouchableOpacity style={styles.ctrlBtn} onPress={openComments}>
+              <Text style={styles.ctrlIcon}>💬</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -358,6 +396,80 @@ export default function ReaderScreen() {
           </View>
         </View>
       )}
+
+      {/* Comments Modal */}
+      <Modal
+        visible={showComments}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowComments(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <TouchableOpacity
+            style={styles.commentOverlay}
+            activeOpacity={1}
+            onPress={() => setShowComments(false)}
+          >
+            <View style={styles.commentSheet}>
+              <View style={styles.commentHeader}>
+                <Text style={styles.commentTitle}>Bình luận</Text>
+                <TouchableOpacity onPress={() => setShowComments(false)}>
+                  <Text style={{ color: "#888", fontSize: 20 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <FlatList
+                data={commentList}
+                keyExtractor={(c) => c.id}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingVertical: 8 }}
+                ListEmptyComponent={
+                  <Text style={styles.commentEmpty}>Chưa có bình luận nào. Hãy là người đầu tiên!</Text>
+                }
+                renderItem={({ item: c }) => (
+                  <View style={styles.commentItem}>
+                    <View style={styles.commentAvatar}>
+                      <Text style={{ fontSize: 16 }}>👤</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.commentUser}>
+                        {c.user?.username ?? "Người dùng ẩn danh"}
+                        {c.is_edited && <Text style={styles.commentEdited}> (đã sửa)</Text>}
+                      </Text>
+                      <Text style={styles.commentContent}>{c.content}</Text>
+                      {c.replies?.length > 0 && (
+                        <Text style={styles.commentReplies}>↳ {c.replies.length} trả lời</Text>
+                      )}
+                    </View>
+                  </View>
+                )}
+              />
+
+              <View style={styles.commentInput}>
+                <TextInput
+                  style={styles.commentTextInput}
+                  placeholder={user && !isGuest ? "Viết bình luận..." : "Đăng nhập để bình luận"}
+                  placeholderTextColor="#555"
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  multiline
+                  editable={!!user && !isGuest}
+                />
+                <TouchableOpacity
+                  style={[styles.commentSend, (!commentText.trim() || sendingComment) && { opacity: 0.4 }]}
+                  onPress={handleSendComment}
+                  disabled={!commentText.trim() || sendingComment}
+                >
+                  <Text style={styles.commentSendText}>Gửi</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -457,4 +569,80 @@ const styles = StyleSheet.create({
   },
   ctrlIcon: { color: PINK, fontSize: 22 },
   ctrlDisabled: { color: "#333" },
+
+  // Comments Modal
+  commentOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  commentSheet: {
+    backgroundColor: "#111",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: "70%",
+    paddingTop: 16,
+  },
+  commentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  commentTitle: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  commentEmpty: {
+    color: "#555",
+    fontSize: 14,
+    textAlign: "center",
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    lineHeight: 22,
+  },
+  commentItem: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1a1a1a",
+  },
+  commentAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#222",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  commentUser: { color: "#aaa", fontSize: 13, fontWeight: "600", marginBottom: 4 },
+  commentEdited: { color: "#555", fontWeight: "normal" },
+  commentContent: { color: "#ddd", fontSize: 14, lineHeight: 20 },
+  commentReplies: { color: "#e91e8c", fontSize: 12, marginTop: 4 },
+  commentInput: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#1a1a1a",
+    gap: 8,
+  },
+  commentTextInput: {
+    flex: 1,
+    backgroundColor: "#1e1e1e",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    color: "#fff",
+    fontSize: 14,
+    maxHeight: 100,
+  },
+  commentSend: {
+    backgroundColor: PINK,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  commentSendText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
 });

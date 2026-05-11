@@ -1,4 +1,4 @@
-import { books as booksApi, favorites as favApi, progress as progressApi, ratings as ratingsApi } from "@/app/lib/api";
+import { books as booksApi, collections as collectionsApi, favorites as favApi, follows as followsApi, progress as progressApi, ratings as ratingsApi } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
 import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
@@ -6,7 +6,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  FlatList,
   Image,
+  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -32,8 +34,11 @@ export default function BookDetailScreen() {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
+  const [followingBook, setFollowingBook] = useState(false);
   const [lastChapter, setLastChapter] = useState<number | null>(null);
   const [userRating, setUserRating] = useState<number>(0);
+  const [collections, setCollections] = useState<Array<{ id: string; name: string }>>([]);
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
 
   useEffect(() => {
     fetchBook();
@@ -63,6 +68,55 @@ export default function BookDetailScreen() {
       });
     }
   }, [user, isGuest, id]);
+
+  // Check follow book status
+  useEffect(() => {
+    if (user && !isGuest && id) {
+      followsApi.checkBook(user.id, id).then(({ data }) => setFollowingBook(!!data));
+    }
+  }, [user, isGuest, id]);
+
+  // Load collections
+  useEffect(() => {
+    if (user && !isGuest) {
+      collectionsApi.list(user.id).then(({ data }) => {
+        if (data) setCollections(data.map((c) => ({ id: c.id, name: c.name })));
+      });
+    }
+  }, [user, isGuest]);
+
+  async function handleFollowBook() {
+    if (!user || isGuest) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để theo dõi truyện.", [
+        { text: "Để sau", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+      ]);
+      return;
+    }
+    const { data: newState } = await followsApi.toggleBook(user.id, id);
+    if (newState !== null) setFollowingBook(newState);
+  }
+
+  async function handleAddToCollection(collectionId: string) {
+    if (!book) return;
+    await collectionsApi.addBook(collectionId, book.id);
+    setShowCollectionModal(false);
+    Alert.alert("✅ Đã thêm", "Truyện đã được thêm vào bộ sưu tập.");
+  }
+
+  async function handleOpenCollection() {
+    if (!user || isGuest) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để dùng bộ sưu tập.", [
+        { text: "Để sau", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+      ]);
+      return;
+    }
+    // Refresh collections trước khi mở
+    const { data } = await collectionsApi.list(user.id);
+    if (data) setCollections(data.map((c) => ({ id: c.id, name: c.name })));
+    setShowCollectionModal(true);
+  }
 
   async function handleRate(star: number) {
     if (!user || isGuest) {
@@ -184,6 +238,18 @@ export default function BookDetailScreen() {
             {/* Author */}
             <View style={styles.infoLine}>
               <Text style={styles.infoIcon}>✒</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (book.author_id) {
+                    router.push({ pathname: "/author/[id]", params: { id: book.author_id } });
+                  }
+                }}
+                disabled={!book.author_id}
+              >
+                <Text style={[styles.infoText, book.author_id && { color: "#e91e8c" }]}>
+                  {authorName}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Status */}
@@ -245,6 +311,7 @@ export default function BookDetailScreen() {
 
         {/* Action buttons */}
         <View style={styles.actionRow}>
+          {/* Yêu thích */}
           <TouchableOpacity
             style={[styles.actionBtn, liked && styles.actionBtnActive]}
             onPress={handleToggleLike}
@@ -253,19 +320,25 @@ export default function BookDetailScreen() {
               {liked ? "♥" : "♡"}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
+          {/* Bộ sưu tập */}
+          <TouchableOpacity style={styles.actionBtn} onPress={handleOpenCollection}>
             <Text style={styles.actionIcon}>⊞</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionIcon}>⊕</Text>
+          {/* Theo dõi truyện */}
+          <TouchableOpacity
+            style={[styles.actionBtn, followingBook && styles.actionBtnActive]}
+            onPress={handleFollowBook}
+          >
+            <Text style={[styles.actionIcon, followingBook && styles.actionIconActive]}>
+              {followingBook ? "🔔" : "🔕"}
+            </Text>
           </TouchableOpacity>
+          {/* Chia sẻ */}
           <TouchableOpacity
             style={styles.actionBtn}
-            onPress={() =>
-              Alert.alert("Thông báo", "Chức năng đang phát triển")
-            }
+            onPress={() => Alert.alert("Chia sẻ", `"${book.title}"\n\nChức năng chia sẻ sẽ sớm có mặt.`)}
           >
-            <Text style={styles.actionIcon}>⊕</Text>
+            <Text style={styles.actionIcon}>⬆</Text>
           </TouchableOpacity>
         </View>
 
@@ -422,6 +495,47 @@ export default function BookDetailScreen() {
           <Text style={styles.bottomTocText}>Mục Lục</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Collection Modal */}
+      <Modal
+        visible={showCollectionModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCollectionModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCollectionModal(false)}
+        >
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Thêm vào bộ sưu tập</Text>
+            {collections.length === 0 ? (
+              <Text style={styles.modalEmpty}>Bạn chưa có bộ sưu tập nào.{"\n"}Tạo mới trong trang Cá Nhân.</Text>
+            ) : (
+              <FlatList
+                data={collections}
+                keyExtractor={(c) => c.id}
+                renderItem={({ item: col }) => (
+                  <TouchableOpacity
+                    style={styles.modalItem}
+                    onPress={() => handleAddToCollection(col.id)}
+                  >
+                    <Text style={styles.modalItemText}>📚 {col.name}</Text>
+                    <Text style={{ color: PINK, fontSize: 18 }}>+</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+            <TouchableOpacity
+              style={styles.modalCancel}
+              onPress={() => setShowCollectionModal(false)}
+            >
+              <Text style={styles.modalCancelText}>Huỷ</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -662,4 +776,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
   },
+
+  // Collection Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: "#1a1a1a",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+    maxHeight: "60%",
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "bold",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  modalEmpty: {
+    color: "#666",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 22,
+    marginVertical: 24,
+  },
+  modalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#2a2a2a",
+  },
+  modalItemText: { color: "#ccc", fontSize: 15 },
+  modalCancel: {
+    marginTop: 16,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#2a2a2a",
+  },
+  modalCancelText: { color: "#aaa", fontSize: 15 },
 });
