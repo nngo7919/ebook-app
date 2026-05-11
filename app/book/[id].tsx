@@ -1,4 +1,4 @@
-import { books as booksApi, favorites as favApi, progress as progressApi } from "@/app/lib/api";
+import { books as booksApi, favorites as favApi, progress as progressApi, ratings as ratingsApi } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
 import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
@@ -33,6 +33,7 @@ export default function BookDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
   const [lastChapter, setLastChapter] = useState<number | null>(null);
+  const [userRating, setUserRating] = useState<number>(0);
 
   useEffect(() => {
     fetchBook();
@@ -53,6 +54,32 @@ export default function BookDetailScreen() {
       });
     }
   }, [user, isGuest, id]);
+
+  // Load rating của user
+  useEffect(() => {
+    if (user && !isGuest && id) {
+      ratingsApi.get(user.id, id).then(({ data }) => {
+        if (data?.rating) setUserRating(data.rating);
+      });
+    }
+  }, [user, isGuest, id]);
+
+  async function handleRate(star: number) {
+    if (!user || isGuest) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để đánh giá.", [
+        { text: "Để sau", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+      ]);
+      return;
+    }
+    const newRating = userRating === star ? 0 : star;
+    setUserRating(newRating);
+    if (newRating === 0) {
+      await ratingsApi.delete(user.id, id);
+    } else {
+      await ratingsApi.post(user.id, id, newRating);
+    }
+  }
 
   async function fetchBook() {
     setLoading(true);
@@ -321,6 +348,27 @@ export default function BookDetailScreen() {
             <Text style={styles.descText}>{book.description}</Text>
           </View>
         ) : null}
+
+        {/* Star Rating */}
+        <View style={styles.ratingSection}>
+          <Text style={styles.ratingLabel}>
+            {userRating > 0 ? `Đánh giá của bạn: ${userRating} sao` : "Đánh giá truyện này"}
+          </Text>
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <TouchableOpacity key={star} onPress={() => handleRate(star)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                <Text style={[styles.star, star <= userRating && styles.starActive]}>
+                  {star <= userRating ? "★" : "☆"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {book.rating_avg > 0 && (
+            <Text style={styles.ratingAvg}>
+              Trung bình: {book.rating_avg.toFixed(1)} ★ ({book.rating_count} lượt)
+            </Text>
+          )}
+        </View>
       </ScrollView>
 
       {/* Bottom bar */}
@@ -584,5 +632,34 @@ const styles = StyleSheet.create({
     color: "#aaa",
     fontSize: 14,
     lineHeight: 22,
+  },
+
+  // Star rating
+  ratingSection: {
+    paddingHorizontal: 20,
+    marginBottom: 28,
+    alignItems: "center",
+  },
+  ratingLabel: {
+    color: "#888",
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  starsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  star: {
+    fontSize: 32,
+    color: "#333",
+  },
+  starActive: {
+    color: "#f5a623",
+  },
+  ratingAvg: {
+    color: "#666",
+    fontSize: 12,
+    marginTop: 4,
   },
 });

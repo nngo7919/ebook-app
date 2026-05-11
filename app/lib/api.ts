@@ -418,6 +418,44 @@ export const books = {
     if (error) return err(supaErr(error))
     return ok(true as const)
   },
+
+  /** Đăng truyện mới (user upload) */
+  async create(data: {
+    title: string
+    author: string
+    description: string | null
+    genres: string
+    tag: 'novel' | 'book'
+    is_full: boolean
+    total_chapters: number
+    is_public: boolean
+    uploader_id: string
+  }): Promise<ApiResult<Book>> {
+    const { data: inserted, error } = await supabase
+      .from('books')
+      .insert({
+        title: data.title,
+        author: data.author,
+        description: data.description,
+        genres: data.genres,
+        tag: data.tag,
+        is_full: data.is_full,
+        total_chapters: data.total_chapters,
+        likes: 0,
+        views: 0,
+        rating_avg: 0,
+        rating_count: 0,
+        comment_count: 0,
+        is_deleted: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select('*')
+      .single()
+
+    if (error) return err(supaErr(error))
+    return ok(parseBook(inserted))
+  },
 }
 
 

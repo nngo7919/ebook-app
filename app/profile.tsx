@@ -1,11 +1,15 @@
+import { profiles as profilesApi } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import {
   Alert,
+  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -29,14 +33,14 @@ function Icon({ type }: { type: string }) {
 const SECTIONS = [
   {
     key: "intro",
-    items: [{ icon: "edit", label: "Giới thiệu cá nhân", route: null, action: "coming_soon" }],
+    items: [{ icon: "edit", label: "Giới thiệu cá nhân", route: null, action: "edit_bio" }],
   },
   {
     key: "truyen",
     title: "TRUYỆN CỦA TÔI",
     items: [
-      { icon: "list", label: "Danh sách", route: null, action: "coming_soon" },
-      { icon: "upload", label: "Đăng truyện & nhận thưởng (web)", route: null, action: "coming_soon" },
+      { icon: "list", label: "Danh sách", route: "/my-books", action: null },
+      { icon: "upload", label: "Đăng truyện mới", route: "/upload", action: null },
     ],
   },
   {
@@ -59,14 +63,34 @@ const SECTIONS = [
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { profile, user, signOut } = useAuth();
+  const { profile, user, signOut, refreshProfile } = useAuth();
 
   const displayName = profile?.display_name ?? user?.email?.split("@")[0] ?? "Người dùng";
   const avatarLetter = displayName.charAt(0).toUpperCase();
 
+  const [showBioModal, setShowBioModal] = useState(false);
+  const [bioText, setBioText] = useState(profile?.bio ?? "");
+  const [savingBio, setSavingBio] = useState(false);
+
+  async function handleSaveBio() {
+    if (!user) return;
+    setSavingBio(true);
+    const { error } = await profilesApi.update(user.id, { bio: bioText.trim() });
+    setSavingBio(false);
+    if (error) {
+      Alert.alert("Lỗi", error);
+    } else {
+      await refreshProfile();
+      setShowBioModal(false);
+    }
+  }
+
   async function handlePress(item: any) {
     if (item.route) {
       router.push(item.route);
+    } else if (item.action === "edit_bio") {
+      setBioText(profile?.bio ?? "");
+      setShowBioModal(true);
     } else if (item.action === "logout") {
       Alert.alert("Đăng xuất", "Bạn có chắc muốn đăng xuất?", [
         { text: "Huỷ", style: "cancel" },
@@ -111,7 +135,51 @@ export default function ProfileScreen() {
           <Text style={styles.avatarLetter}>{avatarLetter}</Text>
         </View>
         <Text style={styles.userName}>{displayName}</Text>
+        {profile?.bio ? (
+          <Text style={styles.userBio}>{profile.bio}</Text>
+        ) : (
+          <TouchableOpacity onPress={() => { setBioText(""); setShowBioModal(true); }}>
+            <Text style={styles.addBioBtn}>+ Thêm giới thiệu</Text>
+          </TouchableOpacity>
+        )}
       </View>
+
+      {/* Bio Modal */}
+      <Modal visible={showBioModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Giới thiệu cá nhân</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={bioText}
+              onChangeText={setBioText}
+              placeholder="Viết vài điều về bản thân..."
+              placeholderTextColor="#555"
+              multiline
+              maxLength={300}
+              autoFocus
+            />
+            <Text style={styles.charCount}>{bioText.length}/300</Text>
+            <View style={styles.modalBtns}>
+              <TouchableOpacity
+                style={styles.modalBtnCancel}
+                onPress={() => setShowBioModal(false)}
+              >
+                <Text style={styles.modalBtnCancelText}>Huỷ</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtnSave, savingBio && { opacity: 0.6 }]}
+                onPress={handleSaveBio}
+                disabled={savingBio}
+              >
+                <Text style={styles.modalBtnSaveText}>
+                  {savingBio ? "Đang lưu..." : "Lưu"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Menu sections */}
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -178,6 +246,79 @@ const styles = StyleSheet.create({
   },
   avatarLetter: { color: "#fff", fontSize: 32, fontWeight: "700" },
   userName: { color: "#ffffff", fontSize: 18, fontWeight: "bold" },
+  userBio: {
+    color: "#888",
+    fontSize: 13,
+    textAlign: "center",
+    marginTop: 8,
+    paddingHorizontal: 32,
+    lineHeight: 20,
+  },
+  addBioBtn: {
+    color: "#4a9eff",
+    fontSize: 13,
+    marginTop: 8,
+  },
+
+  // Bio modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "flex-end",
+  },
+  modalBox: {
+    backgroundColor: "#161616",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "700",
+    marginBottom: 16,
+  },
+  modalInput: {
+    backgroundColor: "#1e1e1e",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    color: "#fff",
+    fontSize: 15,
+    padding: 14,
+    minHeight: 120,
+    textAlignVertical: "top",
+    lineHeight: 22,
+  },
+  charCount: {
+    color: "#555",
+    fontSize: 12,
+    textAlign: "right",
+    marginTop: 6,
+  },
+  modalBtns: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 20,
+  },
+  modalBtnCancel: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#333",
+    alignItems: "center",
+  },
+  modalBtnCancelText: { color: "#888", fontSize: 15 },
+  modalBtnSave: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: PINK,
+    alignItems: "center",
+  },
+  modalBtnSaveText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 
   // Sections
   menuWrapper: { paddingHorizontal: 16, gap: 8 },
