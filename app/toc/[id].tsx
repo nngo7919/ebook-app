@@ -1,3 +1,4 @@
+import { books as booksApi, chapters as chaptersApi } from "@/app/lib/api";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -8,7 +9,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { books as booksApi, chapters as chaptersApi } from "../lib/api";
 
 const PINK = "#e91e8c";
 const CHAPTERS_PER_PAGE = 14;

@@ -1,11 +1,14 @@
-import { books as booksApi, favorites as favApi } from "@/app/lib/api";
+import { books as booksApi, collections as collectionsApi, favorites as favApi, follows as followsApi, progress as progressApi, ratings as ratingsApi } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
+import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   Alert,
+  FlatList,
   Image,
+  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -24,58 +27,141 @@ function formatMinutes(dateStr?: string) {
   return `${Math.floor(diff / 1440)} ngày`;
 }
 
-const FAKE_TAGS = [
-  "Ngôn Tình",
-  "Hiện Đại",
-  "HE",
-  "Xuyên Thư",
-  "Vườn Trường",
-  "NP",
-  "Hài Hước",
-];
-const FAKE_GENRES = [
-  "Nguyên sang",
-  "Ngôn tình",
-  "Hiện đại",
-  "HE",
-  "Tình cảm",
-  "Ngọt văn",
-  "Xuyên thư",
-  "Vườn trường",
-  "NP",
-  "Nhẹ nhàng",
-  "Hài hước",
-];
-
 export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
+  const [followingBook, setFollowingBook] = useState(false);
+  const [lastChapter, setLastChapter] = useState<number | null>(null);
+  const [userRating, setUserRating] = useState<number>(0);
+  const [collections, setCollections] = useState<Array<{ id: string; name: string }>>([]);
+  const [showCollectionModal, setShowCollectionModal] = useState(false);
 
   useEffect(() => {
     fetchBook();
   }, [id]);
 
-  // Check favorite status when user available
+  // Check favorite status — không check cho guest
   useEffect(() => {
-    if (user && id) {
+    if (user && !isGuest && id) {
       favApi.check(user.id, id).then(({ data }) => setLiked(!!data));
     }
-  }, [user, id]);
+  }, [user, isGuest, id]);
+
+  // Load reading progress để biết đọc tiếp chương nào
+  useEffect(() => {
+    if (user && !isGuest && id) {
+      progressApi.get(user.id, id).then(({ data }) => {
+        if (data?.chapter_number) setLastChapter(data.chapter_number);
+      });
+    }
+  }, [user, isGuest, id]);
+
+  // Load rating của user
+  useEffect(() => {
+    if (user && !isGuest && id) {
+      ratingsApi.get(user.id, id).then(({ data }) => {
+        if (data?.rating) setUserRating(data.rating);
+      });
+    }
+  }, [user, isGuest, id]);
+
+  // Check follow book status
+  useEffect(() => {
+    if (user && !isGuest && id) {
+      followsApi.checkBook(user.id, id).then(({ data }) => setFollowingBook(!!data));
+    }
+  }, [user, isGuest, id]);
+
+  // Load collections
+  useEffect(() => {
+    if (user && !isGuest) {
+      collectionsApi.list(user.id).then(({ data }) => {
+        if (data) setCollections(data.map((c) => ({ id: c.id, name: c.name })));
+      });
+    }
+  }, [user, isGuest]);
+
+  async function handleFollowBook() {
+    if (!user || isGuest) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để theo dõi truyện.", [
+        { text: "Để sau", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+      ]);
+      return;
+    }
+    const { data: newState } = await followsApi.toggleBook(user.id, id);
+    if (newState !== null) setFollowingBook(newState);
+  }
+
+  async function handleAddToCollection(collectionId: string) {
+    if (!book) return;
+    await collectionsApi.addBook(collectionId, book.id);
+    setShowCollectionModal(false);
+    Alert.alert("✅ Đã thêm", "Truyện đã được thêm vào bộ sưu tập.");
+  }
+
+  async function handleOpenCollection() {
+    if (!user || isGuest) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để dùng bộ sưu tập.", [
+        { text: "Để sau", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+      ]);
+      return;
+    }
+    // Refresh collections trước khi mở
+    const { data } = await collectionsApi.list(user.id);
+    if (data) setCollections(data.map((c) => ({ id: c.id, name: c.name })));
+    setShowCollectionModal(true);
+  }
+
+  async function handleRate(star: number) {
+    if (!user || isGuest) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để đánh giá.", [
+        { text: "Để sau", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+      ]);
+      return;
+    }
+    const newRating = userRating === star ? 0 : star;
+    setUserRating(newRating);
+    if (newRating === 0) {
+      await ratingsApi.delete(user.id, id);
+    } else {
+      await ratingsApi.post(user.id, id, newRating);
+    }
+  }
 
   async function fetchBook() {
     setLoading(true);
     const { data } = await booksApi.get(id);
-    setBook(data ?? null);
+    if (data) {
+      setBook({ ...data, views: (data.views ?? 0) + 1 });
+      // Guest dùng guestId, user đã đăng nhập dùng userId
+      void booksApi.incrementViews(id, {
+        userId: isGuest ? null : (user?.id ?? null),
+        guestId: isGuest ? (user?.id ?? null) : null,
+      });
+    } else {
+      const fake = FAKE_BOOKS.find((b) => b.id === id) ?? FAKE_BOOKS[0];
+      setBook({ ...fake, id });
+    }
     setLoading(false);
   }
 
   async function handleToggleLike() {
-    if (!user) {
-      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để thích truyện.");
+    if (!user || isGuest) {
+      Alert.alert(
+        "Cần đăng nhập",
+        "Vui lòng đăng nhập để thêm truyện vào yêu thích.",
+        [
+          { text: "Để sau", style: "cancel" },
+          { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+        ],
+      );
       return;
     }
     const { data: newState } = await favApi.toggle(user.id, id);
@@ -105,13 +191,14 @@ export default function BookDetailScreen() {
   const chapters = book.total_chapters ?? 17;
   const likes = book.likes ?? 57;
   const views = book.views ?? 101;
+  const authorName = book.author ?? "Äang cáº­p nháº­t";
   const ago = formatMinutes(book.created_at);
   const tags = book.genres
     ? book.genres.split(",").map((g) => g.trim())
-    : FAKE_TAGS;
+    : (book?.genres_list ?? []);
   const allGenres = book.genres
     ? book.genres.split(",").map((g) => g.trim())
-    : FAKE_GENRES;
+    : (book?.genres_list ?? []);
   const shortTitle =
     book.title.length > 18 ? book.title.slice(0, 18) + "..." : book.title;
 
@@ -151,6 +238,18 @@ export default function BookDetailScreen() {
             {/* Author */}
             <View style={styles.infoLine}>
               <Text style={styles.infoIcon}>✒</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (book.author_id) {
+                    router.push({ pathname: "/author/[id]", params: { id: book.author_id } });
+                  }
+                }}
+                disabled={!book.author_id}
+              >
+                <Text style={[styles.infoText, book.author_id && { color: "#e91e8c" }]}>
+                  {authorName}
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* Status */}
@@ -212,38 +311,61 @@ export default function BookDetailScreen() {
 
         {/* Action buttons */}
         <View style={styles.actionRow}>
+          {/* Yêu thích */}
           <TouchableOpacity
             style={[styles.actionBtn, liked && styles.actionBtnActive]}
-            onPress={() => setLiked(!liked)}
+            onPress={handleToggleLike}
           >
-            <Text style={styles.actionIcon}>{liked ? "♥" : "♡"}</Text>
+            <Text style={[styles.actionIcon, liked && styles.actionIconActive]}>
+              {liked ? "♥" : "♡"}
+            </Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
+          {/* Bộ sưu tập */}
+          <TouchableOpacity style={styles.actionBtn} onPress={handleOpenCollection}>
             <Text style={styles.actionIcon}>⊞</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionIcon}>⊕</Text>
+          {/* Theo dõi truyện */}
+          <TouchableOpacity
+            style={[styles.actionBtn, followingBook && styles.actionBtnActive]}
+            onPress={handleFollowBook}
+          >
+            <Text style={[styles.actionIcon, followingBook && styles.actionIconActive]}>
+              {followingBook ? "🔔" : "🔕"}
+            </Text>
           </TouchableOpacity>
+          {/* Chia sẻ */}
           <TouchableOpacity
             style={styles.actionBtn}
-            onPress={() =>
-              Alert.alert("Thông báo", "Chức năng đang phát triển")
-            }
+            onPress={() => Alert.alert("Chia sẻ", `"${book.title}"\n\nChức năng chia sẻ sẽ sớm có mặt.`)}
           >
-            <Text style={styles.actionIcon}>⊕</Text>
+            <Text style={styles.actionIcon}>⬆</Text>
           </TouchableOpacity>
         </View>
 
         {/* Author info */}
-        <View style={styles.authorRow}>
+        <TouchableOpacity
+          style={styles.authorRow}
+          onPress={() => {
+            if (book.author_id) {
+              router.push({
+                pathname: "/author/[id]",
+                params: { id: book.author_id },
+              });
+            }
+          }}
+          disabled={!book.author_id}
+        >
           <View style={styles.authorAvatar}>
             <Text style={{ fontSize: 22 }}>👤</Text>
           </View>
-          <View>
-            <Text style={styles.authorName}>{book.author}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.authorName}>{authorName}</Text>
             <Text style={styles.authorTime}>{ago}</Text>
           </View>
-        </View>
+          {book.author_id && (
+            <Text style={{ color: "#444", fontSize: 20 }}>›</Text>
+          )}
+        </TouchableOpacity>
 
         {/* Recent chapters */}
         <Text style={styles.sectionLabel}>Các số gần nhất</Text>
@@ -291,13 +413,61 @@ export default function BookDetailScreen() {
         {book.editor && (
           <Text style={styles.editorText}>Editor: {book.editor}</Text>
         )}
+
+        {/* Description */}
+        {book.description ? (
+          <View style={styles.descSection}>
+            <Text style={styles.descLabel}>Giới Thiệu</Text>
+            <Text style={styles.descText}>{book.description}</Text>
+          </View>
+        ) : null}
+
+        {/* Star Rating */}
+        <View style={styles.ratingSection}>
+          <Text style={styles.ratingLabel}>
+            {userRating > 0 ? `Đánh giá của bạn: ${userRating} sao` : "Đánh giá truyện này"}
+          </Text>
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <TouchableOpacity key={star} onPress={() => handleRate(star)} hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}>
+                <Text style={[styles.star, star <= userRating && styles.starActive]}>
+                  {star <= userRating ? "★" : "☆"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {book.rating_avg > 0 && (
+            <Text style={styles.ratingAvg}>
+              Trung bình: {book.rating_avg.toFixed(1)} ★ ({book.rating_count} lượt)
+            </Text>
+          )}
+        </View>
       </ScrollView>
 
       {/* Bottom bar */}
       <View style={styles.bottomBar}>
         <TouchableOpacity
           style={styles.bottomDownload}
-          onPress={() => Alert.alert("Tải về", "Chức năng đang phát triển")}
+          onPress={async () => {
+            if (!user || isGuest) {
+              Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để tải truyện.", [
+                { text: "Để sau", style: "cancel" },
+                { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+              ]);
+              return;
+            }
+            const { library: libApi } = await import("@/app/lib/api");
+            const { data: err } = await libApi.add(user.id, {
+              book_id: book.id,
+              title: book.title,
+              author: book.author ?? "Không rõ",
+              tag: book.tag,
+              cover_url: book.cover_url ?? undefined,
+              source: "download",
+            });
+            if (err === true) Alert.alert("✅ Đã lưu", `"${book.title}" đã thêm vào Tải Gần Đây.`);
+            else Alert.alert("Thông báo", "Đã lưu vào thư viện!");
+          }}
         >
           <Text style={styles.bottomDownloadIcon}>⬇</Text>
           <Text style={styles.bottomDownloadText}>Tải Về</Text>
@@ -305,11 +475,14 @@ export default function BookDetailScreen() {
 
         <TouchableOpacity
           style={styles.bottomRead}
-          onPress={() =>
-            router.push({ pathname: "/reader/[id]", params: { id: book.id } })
-          }
+          onPress={() => {
+            const chapterToOpen = lastChapter ?? 1;
+            router.push({ pathname: "/reader/[id]", params: { id: book.id, chapter: chapterToOpen } });
+          }}
         >
-          <Text style={styles.bottomReadText}>Đọc Truyện</Text>
+          <Text style={styles.bottomReadText}>
+            {lastChapter ? `Đọc Tiếp · Chương ${lastChapter}` : "Đọc Truyện"}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -322,6 +495,47 @@ export default function BookDetailScreen() {
           <Text style={styles.bottomTocText}>Mục Lục</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Collection Modal */}
+      <Modal
+        visible={showCollectionModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCollectionModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowCollectionModal(false)}
+        >
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Thêm vào bộ sưu tập</Text>
+            {collections.length === 0 ? (
+              <Text style={styles.modalEmpty}>Bạn chưa có bộ sưu tập nào.{"\n"}Tạo mới trong trang Cá Nhân.</Text>
+            ) : (
+              <FlatList
+                data={collections}
+                keyExtractor={(c) => c.id}
+                renderItem={({ item: col }) => (
+                  <TouchableOpacity
+                    style={styles.modalItem}
+                    onPress={() => handleAddToCollection(col.id)}
+                  >
+                    <Text style={styles.modalItemText}>📚 {col.name}</Text>
+                    <Text style={{ color: PINK, fontSize: 18 }}>+</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            )}
+            <TouchableOpacity
+              style={styles.modalCancel}
+              onPress={() => setShowCollectionModal(false)}
+            >
+              <Text style={styles.modalCancelText}>Huỷ</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -424,6 +638,7 @@ const styles = StyleSheet.create({
   },
   actionBtnActive: { backgroundColor: PINK },
   actionIcon: { color: PINK, fontSize: 20 },
+  actionIconActive: { color: "#fff" },
 
   // Author
   authorRow: {
@@ -515,4 +730,97 @@ const styles = StyleSheet.create({
   bottomToc: { alignItems: "center", width: 48 },
   bottomTocIcon: { color: PINK, fontSize: 20 },
   bottomTocText: { color: PINK, fontSize: 11, marginTop: 2 },
+
+  // Description
+  descSection: {
+    paddingHorizontal: 20,
+    marginBottom: 24,
+  },
+  descLabel: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
+  descText: {
+    color: "#aaa",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+
+  // Star rating
+  ratingSection: {
+    paddingHorizontal: 20,
+    marginBottom: 28,
+    alignItems: "center",
+  },
+  ratingLabel: {
+    color: "#888",
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  starsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 8,
+  },
+  star: {
+    fontSize: 32,
+    color: "#333",
+  },
+  starActive: {
+    color: "#f5a623",
+  },
+  ratingAvg: {
+    color: "#666",
+    fontSize: 12,
+    marginTop: 4,
+  },
+
+  // Collection Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: "#1a1a1a",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    paddingHorizontal: 20,
+    maxHeight: "60%",
+  },
+  modalTitle: {
+    color: "#fff",
+    fontSize: 17,
+    fontWeight: "bold",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  modalEmpty: {
+    color: "#666",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 22,
+    marginVertical: 24,
+  },
+  modalItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: "#2a2a2a",
+  },
+  modalItemText: { color: "#ccc", fontSize: 15 },
+  modalCancel: {
+    marginTop: 16,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: "#2a2a2a",
+  },
+  modalCancelText: { color: "#aaa", fontSize: 15 },
 });

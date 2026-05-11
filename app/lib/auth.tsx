@@ -3,15 +3,16 @@
 // Quản lý session, login, signup, logout toàn app
 // ============================================================
 
+import { auth as authApi, profiles as profilesApi } from "@/app/lib/api";
 import { supabase } from "@/lib/supabase";
 import type { Session, User } from "@supabase/supabase-js";
 import { useRouter } from "expo-router";
 import {
-	createContext,
-	useCallback,
-	useContext,
-	useEffect,
-	useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 import type { AuthCredentials, Profile, SignUpCredentials } from "./types";
 
@@ -22,11 +23,13 @@ type AuthState = {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  isGuest: boolean;
 };
 
 type AuthActions = {
   signIn: (creds: AuthCredentials) => Promise<{ error: string | null }>;
-  signUp: (creds: SignUpCredentials) => Promise<{ error: string | null }>;
+  signUp: (creds: SignUpCredentials) => Promise<{ error: string | null; requiresConfirmation?: boolean }>;
+  signInAnonymously: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 };
@@ -45,20 +48,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load profile từ Supabase
-  const loadProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+  // isGuest = đã đăng nhập nhưng là anonymous user (không có email)
+  const isGuest = !!user && user.is_anonymous === true;
 
-    if (data) {
-      setProfile({
-        ...data,
-        display_name: data.username ?? "Người dùng",
-      });
-    }
+  // Load profile từ Supabase qua API layer
+  // Anonymous user không có profile — bỏ qua lỗi, không crash
+  const loadProfile = useCallback(async (userId: string, isAnonymous = false) => {
+    if (isAnonymous) return; // guest không có profile row
+    const { data } = await profilesApi.get(userId);
+    if (data) setProfile(data);
   }, []);
 
   // Lắng nghe auth state changes (tự động xử lý session từ AsyncStorage)
@@ -66,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) loadProfile(session.user.id);
+      if (session?.user) loadProfile(session.user.id, session.user.is_anonymous);
       setLoading(false);
     });
 
@@ -76,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        loadProfile(session.user.id);
+        loadProfile(session.user.id, session.user.is_anonymous);
       } else {
         setProfile(null);
       }
@@ -90,28 +88,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (
     creds: AuthCredentials,
   ): Promise<{ error: string | null }> => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: creds.email,
-      password: creds.password,
-    });
-    return { error: error?.message ?? null };
+    const { error } = await authApi.signIn(creds);
+    return { error };
   };
 
   const signUp = async (
     creds: SignUpCredentials,
-  ): Promise<{ error: string | null }> => {
-    const { error } = await supabase.auth.signUp({
-      email: creds.email,
-      password: creds.password,
-      options: {
-        data: { username: creds.username },
-      },
-    });
-    return { error: error?.message ?? null };
+  ): Promise<{ error: string | null; requiresConfirmation?: boolean }> => {
+    const { data, error } = await authApi.signUp(creds);
+    return { error, requiresConfirmation: data?.requiresConfirmation };
+  };
+
+  const signInAnonymously = async (): Promise<{ error: string | null }> => {
+    // Nếu đã có session (anonymous hoặc logged in) thì dùng tiếp, không tạo mới
+    const { data: { session: existing } } = await supabase.auth.getSession();
+    if (existing?.user) {
+      setSession(existing);
+      setUser(existing.user);
+      loadProfile(existing.user.id, existing.user.is_anonymous);
+      return { error: null };
+    }
+    // Chưa có session → tạo anonymous user mới
+    const { error } = await authApi.signInAnonymously();
+    return { error };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await authApi.signOut();
   };
 
   const refreshProfile = async () => {
@@ -125,8 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         session,
         loading,
+        isGuest,
         signIn,
         signUp,
+        signInAnonymously,
         signOut,
         refreshProfile,
       }}

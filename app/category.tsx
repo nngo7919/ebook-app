@@ -1,4 +1,5 @@
 import { books as booksApi } from "@/app/lib/api";
+import { FAKE_BOOKS, FAKE_CATEGORY_MAP } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -21,19 +22,53 @@ export default function CategoryScreen() {
   const { title } = useLocalSearchParams<{ title: string }>();
   const router = useRouter();
   const [books, setBooks] = useState<Book[]>([]);
+  const [allBooks, setAllBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<"created_at" | "views" | "likes" | "rating_avg">("created_at");
+  const [showSort, setShowSort] = useState(false);
+
+  const SORT_OPTIONS: { key: typeof sortBy; label: string }[] = [
+    { key: "created_at", label: "Mới nhất" },
+    { key: "views", label: "Lượt xem" },
+    { key: "likes", label: "Yêu thích" },
+    { key: "rating_avg", label: "Đánh giá" },
+  ];
 
   useEffect(() => {
     fetchBooks();
   }, []);
 
+  useEffect(() => {
+    const sorted = [...allBooks].sort((a, b) => {
+      if (sortBy === "views") return (b.views ?? 0) - (a.views ?? 0);
+      if (sortBy === "likes") return (b.likes ?? 0) - (a.likes ?? 0);
+      if (sortBy === "rating_avg") return (b.rating_avg ?? 0) - (a.rating_avg ?? 0);
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+    setBooks(sorted);
+  }, [sortBy, allBooks]);
+
   async function fetchBooks() {
     setLoading(true);
-    // Nếu có title (genre), tìm theo genre; nếu không lấy tất cả
     const { data } = title
       ? await booksApi.byGenre(title)
       : await booksApi.list();
-    setBooks(data || []);
+    if (data && data.length > 0) {
+      setAllBooks(data);
+    } else {
+      const titleStr = (title as string) ?? "";
+      const mapped = FAKE_CATEGORY_MAP[titleStr];
+      if (mapped) {
+        setAllBooks(mapped);
+      } else {
+        const filtered = FAKE_BOOKS.filter((b) =>
+          b.genres_list?.some((g) =>
+            g.toLowerCase().includes(titleStr.toLowerCase()),
+          ),
+        );
+        setAllBooks(filtered.length > 0 ? filtered : FAKE_BOOKS);
+      }
+    }
     setLoading(false);
   }
 
@@ -83,10 +118,27 @@ export default function CategoryScreen() {
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{title || "Danh Sách"}</Text>
-        <TouchableOpacity style={styles.sortBtn}>
+        <TouchableOpacity style={styles.sortBtn} onPress={() => setShowSort((v) => !v)}>
           <Text style={styles.sortIcon}>⇅</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Sort dropdown */}
+      {showSort && (
+        <View style={styles.sortDropdown}>
+          {SORT_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
+              style={[styles.sortOption, sortBy === opt.key && styles.sortOptionActive]}
+              onPress={() => { setSortBy(opt.key); setShowSort(false); }}
+            >
+              <Text style={[styles.sortOptionText, sortBy === opt.key && styles.sortOptionTextActive]}>
+                {sortBy === opt.key ? "✓ " : ""}{opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {/* Grid */}
       {loading ? (
@@ -224,4 +276,27 @@ const styles = StyleSheet.create({
   loadingText: {
     color: "#888",
   },
+
+  // Sort dropdown
+  sortDropdown: {
+    position: "absolute",
+    top: 60,
+    right: 12,
+    backgroundColor: "#1e1e1e",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    zIndex: 100,
+    overflow: "hidden",
+    minWidth: 140,
+  },
+  sortOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#2a2a2a",
+  },
+  sortOptionActive: { backgroundColor: "#2a2a2a" },
+  sortOptionText: { color: "#ccc", fontSize: 14 },
+  sortOptionTextActive: { color: "#e91e8c", fontWeight: "700" },
 });

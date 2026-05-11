@@ -1,49 +1,37 @@
+import {
+  books as booksApi,
+  chapters as chaptersApi,
+  comments as commentsApi,
+  progress as progressApi,
+} from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
+import {
+  DEFAULT_READER_SETTINGS,
+  type Chapter,
+  type ReaderSettings,
+} from "@/app/lib/types";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Dimensions,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import {
-  books as booksApi,
-  chapters as chaptersApi,
-  progress as progressApi,
-} from "../lib/api";
 
 const PINK = "#e91e8c";
 const { width } = Dimensions.get("window");
-
-type Settings = {
-  bgColor: string;
-  textColor: string;
-  fontSize: number;
-  lineHeight: number;
-  readMode: "scroll" | "page" | "combined";
-};
-
-type Chapter = {
-  id: string;
-  chapter_number: number;
-  title: string;
-  content: string;
-  created_at?: string;
-};
-
-const DEFAULT_SETTINGS: Settings = {
-  bgColor: "#0d0d0d",
-  textColor: "#e0e0e0",
-  fontSize: 19,
-  lineHeight: 1.6,
-  readMode: "combined",
-};
 
 function formatDate(dateStr?: string) {
   if (!dateStr) return "";
@@ -57,7 +45,7 @@ export default function ReaderScreen() {
     chapter?: string;
   }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
 
   const [bookTitle, setBookTitle] = useState("");
   const [totalChapters, setTotalChapters] = useState(1);
@@ -67,17 +55,26 @@ export default function ReaderScreen() {
   const [chapterData, setChapterData] = useState<Chapter | null>(null);
   const [loading, setLoading] = useState(true);
   const [showControls, setShowControls] = useState(true);
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState<ReaderSettings>(
+    DEFAULT_READER_SETTINGS,
+  );
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [autoScrolling, setAutoScrolling] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentList, setCommentList] = useState<any[]>([]);
+  const [commentText, setCommentText] = useState("");
+  const [sendingComment, setSendingComment] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
   const contentHeight = useRef(0);
   const scrollHeight = useRef(0);
+  const scrollY = useRef(0);
+  const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Load settings
   useEffect(() => {
     AsyncStorage.getItem("reader_settings").then((val) => {
-      if (val) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(val) });
+      if (val) setSettings({ ...DEFAULT_READER_SETTINGS, ...JSON.parse(val) });
     });
   }, []);
 
@@ -96,7 +93,20 @@ export default function ReaderScreen() {
     if (data) {
       setBookTitle(data.title);
       setTotalChapters(data.total_chapters ?? 1);
+    } else {
+      // Fallback fake data
+      const { FAKE_BOOKS } = await import("@/app/lib/fake-data");
+      const fake = FAKE_BOOKS.find((b) => b.id === id);
+      if (fake) {
+        setBookTitle(fake.title);
+        setTotalChapters(fake.total_chapters ?? 17);
+      }
     }
+    // Tăng view khi người dùng vào đọc
+    void booksApi.incrementViews(id, {
+      userId: isGuest ? null : (user?.id ?? null),
+      guestId: isGuest ? (user?.id ?? null) : null,
+    });
   }
 
   async function loadChapter(num: number) {
@@ -111,10 +121,15 @@ export default function ReaderScreen() {
       // Fallback content khi chưa có data
       setChapterData({
         id: `fake-${num}`,
+        book_id: id,
         chapter_number: num,
         title: `Chương ${num}`,
         content: `Lão phu bấm ngón tay tính toán, hiện giờ người đang nằm trên giường xem tiểu thuyết, lại còn nằm nghiêng, có khi điện thoại còn đang sạc pin.\n\nDương Gian, cậu học sinh lớp 12, lúc này đang nằm trong chăn, buồn chán lướt điện thoại. Hắn tiện tay mở một bài viết, bên dưới có rất nhiều bình luận của cư dân mạng.\n\n"Thánh thật sự, chủ thớt đoán trúng phóc luôn."\n\n"Mọi người biết tôi đang đi vệ sinh không?"\n\nDương Gian lắc đầu cười, tiếp tục cuộn xuống đọc thêm. Bên ngoài cửa sổ, tiếng gió thổi xào xạc qua những tán lá xanh.`,
+        word_count: 0,
+        is_deleted: false,
+        deleted_at: null,
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       });
     }
     setLoading(false);
@@ -125,13 +140,14 @@ export default function ReaderScreen() {
     const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
     contentHeight.current = contentSize.height;
     scrollHeight.current = layoutMeasurement.height;
+    scrollY.current = contentOffset.y;
     const progress =
       contentOffset.y / (contentSize.height - layoutMeasurement.height);
     const clamped = Math.min(1, Math.max(0, progress));
     setScrollProgress(clamped);
 
     // Tự động lưu progress (debounce đơn giản bằng cách chỉ lưu mỗi 5%)
-    if (user && Math.round(clamped * 100) % 5 === 0) {
+    if (user && !isGuest && Math.round(clamped * 100) % 5 === 0) {
       progressApi.save(user.id, id, currentChapter, clamped * 100);
     }
   }
@@ -139,6 +155,68 @@ export default function ReaderScreen() {
   const toggleControls = useCallback(() => {
     setShowControls((v) => !v);
   }, []);
+
+  function toggleAutoScroll() {
+    if (autoScrolling) {
+      if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+      autoScrollTimer.current = null;
+      setAutoScrolling(false);
+    } else {
+      setAutoScrolling(true);
+      autoScrollTimer.current = setInterval(() => {
+        const maxY = contentHeight.current - scrollHeight.current;
+        if (scrollY.current >= maxY - 2) {
+          if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+          autoScrollTimer.current = null;
+          setAutoScrolling(false);
+          return;
+        }
+        const nextY = Math.min(scrollY.current + (settings.scrollSpeed * 0.4), maxY);
+        scrollRef.current?.scrollTo({ y: nextY, animated: true });
+      }, 80);
+    }
+  }
+
+  // Dừng auto scroll khi đổi chương
+  useEffect(() => {
+    if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+    autoScrollTimer.current = null;
+    setAutoScrolling(false);
+  }, [currentChapter]);
+
+  // Cleanup khi unmount
+  useEffect(() => {
+    return () => {
+      if (autoScrollTimer.current) clearInterval(autoScrollTimer.current);
+    };
+  }, []);
+
+  async function openComments() {
+    setShowComments(true);
+    const { data } = await commentsApi.list(id, { limit: 50 });
+    setCommentList(data ?? []);
+  }
+
+  async function handleSendComment() {
+    if (!user || isGuest) {
+      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để bình luận.", [
+        { text: "Để sau", style: "cancel" },
+        { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+      ]);
+      return;
+    }
+    const text = commentText.trim();
+    if (!text) return;
+    setSendingComment(true);
+    const { data, error } = await commentsApi.post(user.id, id, text);
+    setSendingComment(false);
+    if (error) {
+      Alert.alert("Lỗi", error);
+    } else {
+      setCommentText("");
+      setCommentList((prev) => [data, ...prev]);
+    }
+  }
 
   const shortTitle =
     bookTitle.length > 16 ? bookTitle.slice(0, 16) + "..." : bookTitle;
@@ -279,12 +357,12 @@ export default function ReaderScreen() {
               <Text style={styles.ctrlIcon}>⚙</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.ctrlBtn}>
-              <Text style={styles.ctrlIcon}>▶</Text>
+            <TouchableOpacity style={styles.ctrlBtn} onPress={toggleAutoScroll}>
+              <Text style={[styles.ctrlIcon, autoScrolling && { color: "#fff" }]}>▶</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.ctrlBtn}>
-              <Text style={styles.ctrlIcon}>🎧</Text>
+            <TouchableOpacity style={styles.ctrlBtn} onPress={openComments}>
+              <Text style={styles.ctrlIcon}>💬</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -318,6 +396,80 @@ export default function ReaderScreen() {
           </View>
         </View>
       )}
+
+      {/* Comments Modal */}
+      <Modal
+        visible={showComments}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowComments(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <TouchableOpacity
+            style={styles.commentOverlay}
+            activeOpacity={1}
+            onPress={() => setShowComments(false)}
+          >
+            <View style={styles.commentSheet}>
+              <View style={styles.commentHeader}>
+                <Text style={styles.commentTitle}>Bình luận</Text>
+                <TouchableOpacity onPress={() => setShowComments(false)}>
+                  <Text style={{ color: "#888", fontSize: 20 }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <FlatList
+                data={commentList}
+                keyExtractor={(c) => c.id}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ paddingVertical: 8 }}
+                ListEmptyComponent={
+                  <Text style={styles.commentEmpty}>Chưa có bình luận nào. Hãy là người đầu tiên!</Text>
+                }
+                renderItem={({ item: c }) => (
+                  <View style={styles.commentItem}>
+                    <View style={styles.commentAvatar}>
+                      <Text style={{ fontSize: 16 }}>👤</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.commentUser}>
+                        {c.user?.username ?? "Người dùng ẩn danh"}
+                        {c.is_edited && <Text style={styles.commentEdited}> (đã sửa)</Text>}
+                      </Text>
+                      <Text style={styles.commentContent}>{c.content}</Text>
+                      {c.replies?.length > 0 && (
+                        <Text style={styles.commentReplies}>↳ {c.replies.length} trả lời</Text>
+                      )}
+                    </View>
+                  </View>
+                )}
+              />
+
+              <View style={styles.commentInput}>
+                <TextInput
+                  style={styles.commentTextInput}
+                  placeholder={user && !isGuest ? "Viết bình luận..." : "Đăng nhập để bình luận"}
+                  placeholderTextColor="#555"
+                  value={commentText}
+                  onChangeText={setCommentText}
+                  multiline
+                  editable={!!user && !isGuest}
+                />
+                <TouchableOpacity
+                  style={[styles.commentSend, (!commentText.trim() || sendingComment) && { opacity: 0.4 }]}
+                  onPress={handleSendComment}
+                  disabled={!commentText.trim() || sendingComment}
+                >
+                  <Text style={styles.commentSendText}>Gửi</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -417,4 +569,80 @@ const styles = StyleSheet.create({
   },
   ctrlIcon: { color: PINK, fontSize: 22 },
   ctrlDisabled: { color: "#333" },
+
+  // Comments Modal
+  commentOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  commentSheet: {
+    backgroundColor: "#111",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    height: "70%",
+    paddingTop: 16,
+  },
+  commentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  commentTitle: { color: "#fff", fontSize: 16, fontWeight: "bold" },
+  commentEmpty: {
+    color: "#555",
+    fontSize: 14,
+    textAlign: "center",
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    lineHeight: 22,
+  },
+  commentItem: {
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#1a1a1a",
+  },
+  commentAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#222",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  commentUser: { color: "#aaa", fontSize: 13, fontWeight: "600", marginBottom: 4 },
+  commentEdited: { color: "#555", fontWeight: "normal" },
+  commentContent: { color: "#ddd", fontSize: 14, lineHeight: 20 },
+  commentReplies: { color: "#e91e8c", fontSize: 12, marginTop: 4 },
+  commentInput: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#1a1a1a",
+    gap: 8,
+  },
+  commentTextInput: {
+    flex: 1,
+    backgroundColor: "#1e1e1e",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    color: "#fff",
+    fontSize: 14,
+    maxHeight: 100,
+  },
+  commentSend: {
+    backgroundColor: PINK,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  commentSendText: { color: "#fff", fontWeight: "bold", fontSize: 14 },
 });

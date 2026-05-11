@@ -4,6 +4,7 @@ import {
   progress as progressApi,
 } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
+import { FAKE_MY_BOOKS } from "@/app/lib/fake-data";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -44,17 +45,20 @@ export default function BookListScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) {
+      router.replace("/auth/login");
+      return;
+    }
     fetchBooks();
   }, [type, user]);
 
   async function fetchBooks() {
-    if (!user) return;
     setLoading(true);
 
     let books: MyBook[] = [];
 
     if (type === "favorite") {
-      const { data } = await favApi.list(user.id);
+      const { data } = user ? await favApi.list(user.id) : { data: null };
       books = (data ?? []).map((b) => ({
         id: b.id,
         title: b.title,
@@ -65,7 +69,9 @@ export default function BookListScreen() {
         cover_url: b.cover_url ?? undefined,
       }));
     } else if (type === "recent") {
-      const { data } = await progressApi.recentBooks(user.id);
+      const { data } = user
+        ? await progressApi.recentBooks(user.id)
+        : { data: null };
       books = (data ?? []).map((r) => ({
         id: r.book_id,
         title: r.book.title,
@@ -77,9 +83,11 @@ export default function BookListScreen() {
         current_chapter: r.chapter_number,
       }));
     } else {
-      const { data } = await libApi.list(user.id, {
-        source: type === "download" ? "download" : undefined,
-      });
+      const { data } = user
+        ? await libApi.list(user.id, {
+          source: type === "download" ? "download" : undefined,
+        })
+        : { data: null };
       books = (data ?? []).map((item) => ({
         id: item.id,
         title: item.title,
@@ -89,6 +97,16 @@ export default function BookListScreen() {
         book_id: item.book_id ?? item.id,
         cover_url: item.cover_url ?? undefined,
         current_chapter: item.current_chapter,
+      }));
+    }
+
+    // Fallback fake data nếu chưa có backend
+    if (books.length === 0) {
+      books = FAKE_MY_BOOKS.map((b) => ({
+        ...b,
+        book_id: b.book_id ?? b.id,
+        cover_url: b.cover_url ?? undefined,
+        total_chapters: undefined,
       }));
     }
 
@@ -117,7 +135,19 @@ export default function BookListScreen() {
           text: "Xoá",
           style: "destructive",
           onPress: async () => {
-            // TODO: xoá theo type trong DB
+            if (!user) return;
+            if (type === "favorite") {
+              // Xoá tất cả favorites — toggle từng cái
+              for (const b of allBooks) {
+                await favApi.toggle(user.id, b.book_id || b.id);
+              }
+            } else if (type === "download" || type === "upload" || !type) {
+              // Xoá từng item trong library
+              for (const b of allBooks) {
+                await libApi.remove(user.id, b.id);
+              }
+            }
+            // recent (reading_progress) — không xoá, chỉ clear UI
             setAllBooks([]);
             setFiltered([]);
           },
@@ -127,9 +157,9 @@ export default function BookListScreen() {
   }
 
   function BookItem({ item }: { item: MyBook }) {
-    const chapters =
-      item.total_chapters ?? Math.floor(Math.random() * 1500 + 100);
+    const chapters = item.total_chapters ?? 0;
     const currentChapter = item.current_chapter ?? 1;
+    const isFull = (item as any).is_full ?? false;
 
     return (
       <TouchableOpacity
@@ -146,8 +176,13 @@ export default function BookListScreen() {
             {item.title}
           </Text>
           <View style={{ height: 8 }} />
-          <Text style={styles.itemMeta}>{chapters} chương　【FULL】</Text>
-          <Text style={styles.itemCurrent}>Đang xem: {currentChapter}</Text>
+          <Text style={styles.itemMeta}>
+            {chapters > 0 ? `${chapters} chương` : "Chưa có chương"}
+            {isFull ? "　【FULL】" : "　【Đang ra】"}
+          </Text>
+          {type === "recent" && (
+            <Text style={styles.itemCurrent}>Đang xem: Chương {currentChapter}</Text>
+          )}
         </View>
 
         {/* Cover */}
@@ -161,8 +196,8 @@ export default function BookListScreen() {
               </Text>
             </View>
           )}
-          <View style={styles.fullBadge}>
-            <Text style={styles.fullBadgeText}>FULL</Text>
+          <View style={[styles.fullBadge, !isFull && { backgroundColor: "#e67e22" }]}>
+            <Text style={styles.fullBadgeText}>{isFull ? "FULL" : "ĐANG RA"}</Text>
           </View>
         </View>
       </TouchableOpacity>
