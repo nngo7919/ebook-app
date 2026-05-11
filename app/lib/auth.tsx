@@ -100,6 +100,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInAnonymously = async (): Promise<{ error: string | null }> => {
+    // Nếu đã có session (anonymous hoặc logged in) thì dùng tiếp, không tạo mới
+    const { data: { session: existing } } = await supabase.auth.getSession();
+    if (existing?.user) {
+      setSession(existing);
+      setUser(existing.user);
+      loadProfile(existing.user.id, existing.user.is_anonymous);
+      return { error: null };
+    }
+    // Chưa có session → tạo anonymous user mới
     const { error } = await authApi.signInAnonymously();
     return { error };
   };

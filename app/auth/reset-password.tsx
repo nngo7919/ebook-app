@@ -1,14 +1,14 @@
 // ============================================================
 // app/auth/reset-password.tsx — Màn hình đặt lại mật khẩu
-// Được mở khi user bấm link trong email → deep link vào app
-// Supabase gắn access_token + refresh_token vào URL fragment
-// expo-router tự parse và AuthProvider nhận session mới
+// Flow:
+//   1. User bấm link email → deep link ebook-app://auth/reset-password#access_token=...
+//   2. _layout.tsx bắt link, gọi supabase.setSession() rồi navigate đến đây
+//   3. Session đã sẵn sàng khi màn hình mount → updateUser() ghi mật khẩu mới
 // ============================================================
 
-import { auth as authApi } from "@/app/lib/api";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import {
 	ActivityIndicator,
 	Alert,
@@ -29,32 +29,16 @@ export default function ResetPasswordScreen() {
 	const [password, setPassword] = useState("");
 	const [confirm, setConfirm] = useState("");
 	const [loading, setLoading] = useState(false);
-	const [sessionReady, setSessionReady] = useState(false);
 	const [done, setDone] = useState(false);
 	const confirmRef = useRef<TextInput>(null);
-
-	// Supabase tự gắn session sau khi parse deep link token.
-	// Lắng nghe event PASSWORD_RECOVERY để biết khi nào sẵn sàng.
-	useEffect(() => {
-		const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-			if (event === "PASSWORD_RECOVERY") {
-				setSessionReady(true);
-			}
-		});
-		// Kiểm tra session hiện tại ngay khi mount (trường hợp đã set rồi)
-		supabase.auth.getSession().then(({ data }) => {
-			if (data.session) setSessionReady(true);
-		});
-		return () => subscription.unsubscribe();
-	}, []);
 
 	async function handleReset() {
 		if (!password.trim()) {
 			Alert.alert("Thiếu thông tin", "Vui lòng nhập mật khẩu mới.");
 			return;
 		}
-		if (password.length < 8) {
-			Alert.alert("Mật khẩu quá ngắn", "Mật khẩu phải có ít nhất 8 ký tự.");
+		if (password.length < 6) {
+			Alert.alert("Mật khẩu quá ngắn", "Mật khẩu phải có ít nhất 6 ký tự.");
 			return;
 		}
 		if (password !== confirm) {
@@ -62,33 +46,33 @@ export default function ResetPasswordScreen() {
 			return;
 		}
 
+		// Kiểm tra session trước khi gọi updateUser
+		const { data: sessionData } = await supabase.auth.getSession();
+		if (!sessionData.session) {
+			Alert.alert(
+				"Link đã hết hạn",
+				"Link đặt lại mật khẩu đã hết hạn hoặc đã dùng rồi. Vui lòng gửi lại email.",
+				[
+					{ text: "Để sau", style: "cancel" },
+					{ text: "Gửi lại", onPress: () => router.replace("/auth/forgot-password") },
+				],
+			);
+			return;
+		}
+
 		setLoading(true);
-		const { error } = await authApi.updatePassword(password);
+		// Gọi trực tiếp supabase.auth.updateUser thay vì qua api wrapper
+		// để đảm bảo dùng đúng session hiện tại
+		const { error } = await supabase.auth.updateUser({ password });
 		setLoading(false);
 
 		if (error) {
-			Alert.alert("Lỗi", error);
+			Alert.alert("Lỗi", error.message ?? "Không thể đặt lại mật khẩu. Thử lại sau.");
 		} else {
+			// Đăng xuất sau khi đổi xong để user đăng nhập lại với mật khẩu mới
+			await supabase.auth.signOut();
 			setDone(true);
 		}
-	}
-
-	// Chờ session từ deep link
-	if (!sessionReady) {
-		return (
-			<SafeAreaView style={s.root}>
-				<View style={s.waitWrap}>
-					<ActivityIndicator color={PINK} size="large" />
-					<Text style={s.waitText}>Đang xác thực link...</Text>
-					<Text style={s.waitSub}>
-						Nếu chờ quá lâu, hãy thử gửi lại email đặt lại mật khẩu.
-					</Text>
-					<TouchableOpacity onPress={() => router.replace("/auth/forgot-password")}>
-						<Text style={s.retryLink}>Gửi lại email</Text>
-					</TouchableOpacity>
-				</View>
-			</SafeAreaView>
-		);
 	}
 
 	// Đặt lại thành công
@@ -131,7 +115,7 @@ export default function ResetPasswordScreen() {
 						style={s.input}
 						value={password}
 						onChangeText={setPassword}
-						placeholder="Ít nhất 8 ký tự"
+						placeholder="Ít nhất 6 ký tự"
 						placeholderTextColor="#555"
 						secureTextEntry
 						autoFocus
@@ -209,18 +193,6 @@ const s = StyleSheet.create({
 	},
 	btnDisabled: { opacity: 0.45 },
 	btnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-
-	// Loading state
-	waitWrap: {
-		flex: 1,
-		alignItems: "center",
-		justifyContent: "center",
-		gap: 14,
-		paddingHorizontal: 32,
-	},
-	waitText: { color: "#fff", fontSize: 17, fontWeight: "600" },
-	waitSub: { color: "#666", fontSize: 14, textAlign: "center", lineHeight: 22 },
-	retryLink: { color: PINK, fontSize: 15, marginTop: 8 },
 
 	// Success state
 	successWrap: {

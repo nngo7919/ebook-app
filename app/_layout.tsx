@@ -30,11 +30,19 @@ function DeepLinkHandler() {
     async function handleUrl(url: string) {
       const params = parseFragment(url);
       if (params.type === "recovery" && params.access_token) {
-        // Set session từ token trong URL trước khi navigate
-        await supabase.auth.setSession({
-          access_token: params.access_token,
-          refresh_token: params.refresh_token ?? "",
-        });
+        try {
+          // Set session từ token — phải xong trước khi navigate
+          const { error } = await supabase.auth.setSession({
+            access_token: params.access_token,
+            refresh_token: params.refresh_token ?? "",
+          });
+          if (error) {
+            console.warn("[DeepLink] setSession error:", error.message);
+          }
+        } catch (e) {
+          console.warn("[DeepLink] setSession threw:", e);
+        }
+        // Navigate dù setSession lỗi — màn hình reset sẽ kiểm tra session lại
         router.replace("/auth/reset-password" as any);
       }
     }
