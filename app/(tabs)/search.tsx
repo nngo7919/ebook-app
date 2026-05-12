@@ -125,7 +125,7 @@ export default function SearchScreen() {
       <TouchableOpacity
         style={styles.resultItem}
         onPress={() =>
-          router.push({ pathname: "/book/[id]", params: { id: item.id } })
+          router.push(`/book/${item.id}` as any)
         }
       >
         <View style={styles.resultInfo}>

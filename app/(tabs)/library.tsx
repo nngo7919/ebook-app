@@ -73,7 +73,7 @@ export default function LibraryScreen() {
       <TouchableOpacity
         style={styles.bookCard}
         onPress={() =>
-          router.push({ pathname: "/book/[id]", params: { id: item.id } })
+          router.push(`/book/${item.id}` as any)
         }
       >
         <View style={styles.bookCover}>
@@ -132,7 +132,7 @@ export default function LibraryScreen() {
               style={styles.quickFilterBtn}
               onPress={() => {
                 if (f.route === "trending") {
-                  router.push("/trending");
+                  router.push("/trending" as any);
                 } else {
                   router.push({
                     pathname: "/category",

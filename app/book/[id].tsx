@@ -28,7 +28,7 @@ function formatMinutes(dateStr?: string) {
 export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isGuest, guestId } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
@@ -37,20 +37,28 @@ export default function BookDetailScreen() {
     fetchBook();
   }, [id]);
 
-  // Check favorite status when user available
+  // Check favorite status — không check cho guest
   useEffect(() => {
-    if (user && id) {
+    if (user && !isGuest && id) {
       favApi.check(user.id, id).then(({ data }) => setLiked(!!data));
     }
-  }, [user, id]);
+  }, [user, isGuest, id]);
 
   async function fetchBook() {
     setLoading(true);
     const { data } = await booksApi.get(id);
     if (data) {
+<<<<<<< Updated upstream
       setBook(data);
+=======
+      setBook({ ...data, views: (data.views ?? 0) + 1 });
+      // Guest dùng guestId, user đã đăng nhập dùng userId
+      void booksApi.incrementViews(id, {
+        userId: isGuest ? null : (user?.id ?? null),
+        guestId: isGuest ? guestId : null,
+      });
+>>>>>>> Stashed changes
     } else {
-      // Fake data — tìm trong FAKE_BOOKS theo id, nếu không có dùng phần tử đầu
       const fake = FAKE_BOOKS.find((b) => b.id === id) ?? FAKE_BOOKS[0];
       setBook({ ...fake, id });
     }
@@ -58,8 +66,15 @@ export default function BookDetailScreen() {
   }
 
   async function handleToggleLike() {
-    if (!user) {
-      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để thích truyện.");
+    if (!user || isGuest) {
+      Alert.alert(
+        "Cần đăng nhập",
+        "Vui lòng đăng nhập để thêm truyện vào yêu thích.",
+        [
+          { text: "Để sau", style: "cancel" },
+          { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+        ],
+      );
       return;
     }
     const { data: newState } = await favApi.toggle(user.id, id);
@@ -299,7 +314,7 @@ export default function BookDetailScreen() {
         <TouchableOpacity
           style={styles.bottomToc}
           onPress={() =>
-            router.push({ pathname: "/toc/[id]", params: { id: book.id } })
+            router.push(`/toc/${book.id}` as any)
           }
         >
           <Text style={styles.bottomTocIcon}>≡</Text>

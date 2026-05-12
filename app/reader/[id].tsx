@@ -259,7 +259,7 @@ export default function ReaderScreen() {
             <TouchableOpacity
               style={styles.ctrlBtn}
               onPress={() =>
-                router.push({ pathname: "/reader-settings", params: { id } })
+                router.push({ pathname: "/reader-settings" as any, params: { id } })
               }
             >
               <Text style={styles.ctrlIcon}>⚙</Text>
@@ -277,7 +277,7 @@ export default function ReaderScreen() {
               style={styles.ctrlBtn}
               onPress={() =>
                 router.push({
-                  pathname: "/toc/[id]",
+                  pathname: "/toc/[id]" as any,
                   params: { id, chapter: currentChapter },
                 })
               }

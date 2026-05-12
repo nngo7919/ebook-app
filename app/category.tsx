@@ -58,7 +58,7 @@ export default function CategoryScreen() {
       <TouchableOpacity
         style={styles.card}
         onPress={() =>
-          router.push({ pathname: "/book/[id]", params: { id: item.id } })
+          router.push(`/book/${item.id}` as any)
         }
       >
         {/* Cover */}

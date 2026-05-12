@@ -37,7 +37,7 @@ type MyBook = {
 
 export default function MyLibraryScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const [recentBooks, setRecentBooks] = useState<MyBook[]>([]);
   const [favoriteBooks, setFavoriteBooks] = useState<MyBook[]>([]);
   const [downloadedBooks, setDownloadedBooks] = useState<MyBook[]>([]);
@@ -94,14 +94,14 @@ export default function MyLibraryScreen() {
       dlMapped.length > 0
         ? dlMapped
         : FAKE_LIBRARY_ITEMS.map((item) => ({
-            id: item.id,
-            title: item.title,
-            author: item.author,
-            tag: item.tag,
-            source: item.source,
-            book_id: item.book_id ?? item.id,
-            cover_url: item.cover_url ?? undefined,
-          })),
+          id: item.id,
+          title: item.title,
+          author: item.author,
+          tag: item.tag,
+          source: item.source,
+          book_id: item.book_id ?? item.id,
+          cover_url: item.cover_url ?? undefined,
+        })),
     );
 
     setLoading(false);
@@ -230,6 +230,20 @@ export default function MyLibraryScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
+        {/* Banner cho guest */}
+        {isGuest && (
+          <View style={styles.guestBanner}>
+            <Text style={styles.guestBannerIcon}>📚</Text>
+            <Text style={styles.guestBannerTitle}>
+              Đăng nhập để lưu thư viện
+            </Text>
+            <Text style={styles.guestBannerSub}>
+              Tiến độ đọc, yêu thích và sách đã tải sẽ được đồng bộ khi bạn
+              đăng nhập.
+            </Text>
+          </View>
+        )}
+
         {/* Đọc Gần Đây */}
         <SectionHeader
           title="Đang Đọc · Thiết Bị"
@@ -406,5 +420,32 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#555",
     fontSize: 13,
+  },
+
+  // Guest banner
+  guestBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    backgroundColor: "#1a1a1a",
+    borderRadius: 12,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#2a2a2a",
+    alignItems: "center",
+    gap: 6,
+  },
+  guestBannerIcon: { fontSize: 32, marginBottom: 4 },
+  guestBannerTitle: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  guestBannerSub: {
+    color: "#777",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 18,
   },
 });

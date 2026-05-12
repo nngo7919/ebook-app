@@ -147,10 +147,7 @@ export default function BookListScreen() {
       <TouchableOpacity
         style={styles.item}
         onPress={() =>
-          router.push({
-            pathname: "/book/[id]",
-            params: { id: item.book_id || item.id },
-          })
+          router.push(`/book/${item.book_id || item.id}` as any)
         }
       >
         <View style={styles.info}>
