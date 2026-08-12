@@ -1,9 +1,14 @@
 import { Tabs } from "expo-router";
+<<<<<<< Updated upstream
 import { Text } from "react-native";
 
 function TabIcon({ emoji }: { emoji: string }) {
   return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
 }
+=======
+import React from "react";
+import { View } from "react-native";
+>>>>>>> Stashed changes
 
 export default function TabLayout() {
   return (

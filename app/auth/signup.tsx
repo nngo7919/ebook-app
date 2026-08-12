@@ -59,11 +59,31 @@ export default function SignupScreen() {
       return;
     }
 
+<<<<<<< Updated upstream
     Alert.alert(
       "Đăng ký thành công! 🎉",
       "Vui lòng kiểm tra email để xác nhận tài khoản, sau đó đăng nhập.",
       [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login") }],
     );
+=======
+    if (requiresConfirmation) {
+      // Confirm email = ON → session chưa tạo, chỉ cần báo user kiểm tra email
+      Alert.alert(
+        "Kiểm tra email của bạn 📬",
+        `Chúng tôi đã gửi link xác nhận đến ${email.trim()}. Sau khi xác nhận hãy đăng nhập.`,
+        [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login" as any) }],
+      );
+    } else {
+      // Confirm email = OFF → Supabase tạo session luôn, cần sign out
+      // trước khi alert để tránh AuthProvider tự redirect sang tabs
+      await signOut();
+      Alert.alert(
+        "Đăng ký thành công! 🎉",
+        "Tài khoản đã được tạo. Bạn có thể đăng nhập ngay bây giờ.",
+        [{ text: "Đăng nhập", onPress: () => router.replace("/auth/login" as any) }],
+      );
+    }
+>>>>>>> Stashed changes
   }
 
   return (
@@ -147,7 +167,7 @@ export default function SignupScreen() {
 
           <View style={s.footer}>
             <Text style={s.footerText}>Đã có tài khoản? </Text>
-            <TouchableOpacity onPress={() => router.replace("/auth/login")}>
+            <TouchableOpacity onPress={() => router.replace("/auth/login" as any)}>
               <Text style={s.footerLink}>Đăng nhập</Text>
             </TouchableOpacity>
           </View>

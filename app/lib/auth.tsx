@@ -3,15 +3,17 @@
 // Quản lý session, login, signup, logout toàn app
 // ============================================================
 
+import { auth as authApi, profiles as profilesApi } from "@/app/lib/api";
+import { useGuestId } from "@/app/lib/useGuestId";
 import { supabase } from "@/lib/supabase";
 import type { Session, User } from "@supabase/supabase-js";
 import { useRouter } from "expo-router";
 import {
-	createContext,
-	useCallback,
-	useContext,
-	useEffect,
-	useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
 } from "react";
 import type { AuthCredentials, Profile, SignUpCredentials } from "./types";
 
@@ -22,6 +24,11 @@ type AuthState = {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+<<<<<<< Updated upstream
+=======
+  isGuest: boolean;
+  guestId: string | null;
+>>>>>>> Stashed changes
 };
 
 type AuthActions = {
@@ -45,20 +52,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Load profile từ Supabase
-  const loadProfile = useCallback(async (userId: string) => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+<<<<<<< Updated upstream
+=======
+  // Persistent device ID — dùng cho guest book view tracking
+  const guestId = useGuestId();
 
-    if (data) {
-      setProfile({
-        ...data,
-        display_name: data.username ?? "Người dùng",
-      });
-    }
+  // isGuest = đã đăng nhập nhưng là anonymous user (không có email)
+  const isGuest = !!user && user.is_anonymous === true;
+
+>>>>>>> Stashed changes
+  // Load profile từ Supabase qua API layer
+  const loadProfile = useCallback(async (userId: string) => {
+    const { data } = await profilesApi.get(userId);
+    if (data) setProfile(data);
   }, []);
 
   // Lắng nghe auth state changes (tự động xử lý session từ AsyncStorage)
@@ -90,28 +96,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (
     creds: AuthCredentials,
   ): Promise<{ error: string | null }> => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email: creds.email,
-      password: creds.password,
-    });
-    return { error: error?.message ?? null };
+    const { error } = await authApi.signIn(creds);
+    return { error };
   };
 
   const signUp = async (
     creds: SignUpCredentials,
   ): Promise<{ error: string | null }> => {
-    const { error } = await supabase.auth.signUp({
-      email: creds.email,
-      password: creds.password,
-      options: {
-        data: { username: creds.username },
-      },
-    });
-    return { error: error?.message ?? null };
+    const { error } = await authApi.signUp(creds);
+    return { error };
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await authApi.signOut();
   };
 
   const refreshProfile = async () => {
@@ -125,6 +122,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         session,
         loading,
+<<<<<<< Updated upstream
+=======
+        isGuest,
+        guestId,
+>>>>>>> Stashed changes
         signIn,
         signUp,
         signOut,

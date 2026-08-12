@@ -97,7 +97,11 @@ export default function LoginScreen() {
         {/* Footer */}
         <View style={s.footer}>
           <Text style={s.footerText}>Chưa có tài khoản? </Text>
+<<<<<<< Updated upstream
           <TouchableOpacity onPress={() => router.push("./auth/signup")}>
+=======
+          <TouchableOpacity onPress={() => router.push("/auth/signup" as any)}>
+>>>>>>> Stashed changes
             <Text style={s.footerLink}>Đăng ký ngay</Text>
           </TouchableOpacity>
         </View>

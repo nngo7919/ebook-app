@@ -1,7 +1,8 @@
 import { books as booksApi } from "@/app/lib/api";
+import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -34,19 +35,37 @@ export default function LibraryScreen() {
   const router = useRouter();
   const [newBooks, setNewBooks] = useState<Book[]>([]);
   const [updatedBooks, setUpdatedBooks] = useState<Book[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  // Derived fake lists — computed một lần từ FAKE_BOOKS
+  const ratedBooks = [...FAKE_BOOKS]
+    .sort((a, b) => b.likes / (b.views || 1) - a.likes / (a.views || 1))
+    .slice(0, 6);
+  const likedBooks = [...FAKE_BOOKS]
+    .sort((a, b) => b.likes - a.likes)
+    .slice(0, 6);
+  const viewedBooks = [...FAKE_BOOKS]
+    .sort((a, b) => b.views - a.views)
+    .slice(0, 6);
+  const fullBooks = FAKE_BOOKS.filter((b) => b.is_full);
 
   useEffect(() => {
     fetchBooks();
   }, []);
 
   async function fetchBooks() {
+<<<<<<< Updated upstream
     setLoading(true);
     const { data } = await booksApi.list({ orderBy: "created_at", limit: 12 });
+    const all = data && data.length > 0 ? data : FAKE_BOOKS;
+=======
+    const { data } = await supabase
+      .from("books")
+      .select("*")
+      .order("created_at", { ascending: false });
     const all = data || [];
+>>>>>>> Stashed changes
     setNewBooks(all.slice(0, 6));
     setUpdatedBooks(all.slice(0, 6));
-    setLoading(false);
   }
 
   function BookCard({ item }: { item: Book }) {
@@ -54,7 +73,7 @@ export default function LibraryScreen() {
       <TouchableOpacity
         style={styles.bookCard}
         onPress={() =>
-          router.push({ pathname: "/book/[id]", params: { id: item.id } })
+          router.push(`/book/${item.id}` as any)
         }
       >
         <View style={styles.bookCover}>
@@ -113,7 +132,7 @@ export default function LibraryScreen() {
               style={styles.quickFilterBtn}
               onPress={() => {
                 if (f.route === "trending") {
-                  router.push("/trending");
+                  router.push("/trending" as any);
                 } else {
                   router.push({
                     pathname: "/category",
@@ -142,9 +161,9 @@ export default function LibraryScreen() {
           data={newBooks}
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id + "new"}
+          keyExtractor={(item: Book) => item.id + "new"}
           contentContainerStyle={styles.horizontalList}
-          renderItem={({ item }) => <BookCard item={item} />}
+          renderItem={({ item }: { item: Book }) => <BookCard item={item} />}
         />
 
         {/* Mới Cập Nhật */}
@@ -161,7 +180,64 @@ export default function LibraryScreen() {
           data={updatedBooks}
           horizontal
           showsHorizontalScrollIndicator={false}
-          keyExtractor={(item) => item.id + "updated"}
+          keyExtractor={(item: Book) => item.id + "updated"}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }: { item: Book }) => <BookCard item={item} />}
+        />
+
+        {/* Đánh Giá Cao */}
+        <SectionHeader
+          title="⭐ Đánh giá cao"
+          onMore={() =>
+            router.push({
+              pathname: "/category",
+              params: { title: "Đánh Giá" },
+            })
+          }
+        />
+        <FlatList
+          data={ratedBooks}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id + "rated"}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => <BookCard item={item} />}
+        />
+
+        {/* Yêu Thích */}
+        <SectionHeader
+          title="❤️ Yêu thích nhiều"
+          onMore={() =>
+            router.push({
+              pathname: "/category",
+              params: { title: "Yêu Thích" },
+            })
+          }
+        />
+        <FlatList
+          data={likedBooks}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id + "liked"}
+          contentContainerStyle={styles.horizontalList}
+          renderItem={({ item }) => <BookCard item={item} />}
+        />
+
+        {/* Xem Nhiều */}
+        <SectionHeader
+          title="📊 Xem nhiều"
+          onMore={() =>
+            router.push({
+              pathname: "/category",
+              params: { title: "Xem Nhiều" },
+            })
+          }
+        />
+        <FlatList
+          data={viewedBooks}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(item) => item.id + "viewed"}
           contentContainerStyle={styles.horizontalList}
           renderItem={({ item }) => <BookCard item={item} />}
         />
@@ -185,6 +261,18 @@ export default function LibraryScreen() {
               </TouchableOpacity>
             ))}
           </View>
+          {/* Preview full books */}
+          <FlatList
+            data={fullBooks.slice(0, 6)}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item) => item.id + "full"}
+            contentContainerStyle={[
+              styles.horizontalList,
+              { paddingHorizontal: 0, marginTop: 12 },
+            ]}
+            renderItem={({ item }) => <BookCard item={item} />}
+          />
         </View>
 
         <View style={{ height: 32 }} />

@@ -46,7 +46,7 @@ export default function TrendingScreen() {
       <TouchableOpacity
         style={styles.rankItem}
         onPress={() =>
-          router.push({ pathname: "/book/[id]", params: { id: item.id } })
+          router.push(`/book/${item.id}` as any)
         }
       >
         <Text style={styles.rankNumber}>{index + 1}</Text>

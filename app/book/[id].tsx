@@ -1,5 +1,6 @@
 import { books as booksApi, favorites as favApi } from "@/app/lib/api";
 import { useAuth } from "@/app/lib/auth";
+import { FAKE_BOOKS } from "@/app/lib/fake-data";
 import type { Book } from "@/app/lib/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
@@ -24,33 +25,10 @@ function formatMinutes(dateStr?: string) {
   return `${Math.floor(diff / 1440)} ngày`;
 }
 
-const FAKE_TAGS = [
-  "Ngôn Tình",
-  "Hiện Đại",
-  "HE",
-  "Xuyên Thư",
-  "Vườn Trường",
-  "NP",
-  "Hài Hước",
-];
-const FAKE_GENRES = [
-  "Nguyên sang",
-  "Ngôn tình",
-  "Hiện đại",
-  "HE",
-  "Tình cảm",
-  "Ngọt văn",
-  "Xuyên thư",
-  "Vườn trường",
-  "NP",
-  "Nhẹ nhàng",
-  "Hài hước",
-];
-
 export default function BookDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isGuest, guestId } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [liked, setLiked] = useState(false);
@@ -59,23 +37,44 @@ export default function BookDetailScreen() {
     fetchBook();
   }, [id]);
 
-  // Check favorite status when user available
+  // Check favorite status — không check cho guest
   useEffect(() => {
-    if (user && id) {
+    if (user && !isGuest && id) {
       favApi.check(user.id, id).then(({ data }) => setLiked(!!data));
     }
-  }, [user, id]);
+  }, [user, isGuest, id]);
 
   async function fetchBook() {
     setLoading(true);
     const { data } = await booksApi.get(id);
-    setBook(data ?? null);
+    if (data) {
+<<<<<<< Updated upstream
+      setBook(data);
+=======
+      setBook({ ...data, views: (data.views ?? 0) + 1 });
+      // Guest dùng guestId, user đã đăng nhập dùng userId
+      void booksApi.incrementViews(id, {
+        userId: isGuest ? null : (user?.id ?? null),
+        guestId: isGuest ? guestId : null,
+      });
+>>>>>>> Stashed changes
+    } else {
+      const fake = FAKE_BOOKS.find((b) => b.id === id) ?? FAKE_BOOKS[0];
+      setBook({ ...fake, id });
+    }
     setLoading(false);
   }
 
   async function handleToggleLike() {
-    if (!user) {
-      Alert.alert("Cần đăng nhập", "Vui lòng đăng nhập để thích truyện.");
+    if (!user || isGuest) {
+      Alert.alert(
+        "Cần đăng nhập",
+        "Vui lòng đăng nhập để thêm truyện vào yêu thích.",
+        [
+          { text: "Để sau", style: "cancel" },
+          { text: "Đăng nhập", onPress: () => router.push("/auth/login" as any) },
+        ],
+      );
       return;
     }
     const { data: newState } = await favApi.toggle(user.id, id);
@@ -108,10 +107,10 @@ export default function BookDetailScreen() {
   const ago = formatMinutes(book.created_at);
   const tags = book.genres
     ? book.genres.split(",").map((g) => g.trim())
-    : FAKE_TAGS;
+    : (book?.genres_list ?? []);
   const allGenres = book.genres
     ? book.genres.split(",").map((g) => g.trim())
-    : FAKE_GENRES;
+    : (book?.genres_list ?? []);
   const shortTitle =
     book.title.length > 18 ? book.title.slice(0, 18) + "..." : book.title;
 
@@ -315,7 +314,7 @@ export default function BookDetailScreen() {
         <TouchableOpacity
           style={styles.bottomToc}
           onPress={() =>
-            router.push({ pathname: "/toc/[id]", params: { id: book.id } })
+            router.push(`/toc/${book.id}` as any)
           }
         >
           <Text style={styles.bottomTocIcon}>≡</Text>
